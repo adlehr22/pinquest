@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Leaflet overrides ────────────────────────────────── */
+.leaflet-container {
+  font-family: inherit;
+  background: #e8f4fd;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* ── Custom pin animation ─────────────────────────────── */
+@keyframes pinDropAnim {
+  0%   { transform: scale(0) translateY(-12px); opacity: 0; }
+  70%  { transform: scale(1.35) translateY(0);  opacity: 1; }
+  100% { transform: scale(1) translateY(0);     opacity: 1; }
+}
+
+.leaflet-teardrop-icon svg {
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2));
+  animation: pinDropAnim 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Global resets ────────────────────────────────────── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  overscroll-behavior: none;
+}
+
+/* Smooth scrolling on iOS */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
