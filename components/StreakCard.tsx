@@ -21,32 +21,30 @@ export default function StreakCard({ current, longest, onMilestone }: StreakCard
   const nextMilestone = STREAK_MILESTONES.find((m) => m > current)
 
   return (
-    <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+    <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl px-5 py-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">
             Daily Streak
           </p>
-          <p className="text-3xl font-black text-gray-900">
+          <p className="text-3xl font-black text-gray-900 dark:text-slate-100">
             🔥 {current}
-            <span className="text-base font-semibold text-gray-400 ml-1">
+            <span className="text-base font-semibold text-gray-400 dark:text-slate-500 ml-1">
               {current === 1 ? 'day' : 'days'}
             </span>
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-gray-400">Best</p>
-          <p className="text-lg font-bold text-gray-600">🏅 {longest}</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500">Best</p>
+          <p className="text-lg font-bold text-gray-600 dark:text-slate-300">🏅 {longest}</p>
         </div>
       </div>
       {nextMilestone && (
         <div className="mt-2">
-          <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-amber-100 dark:bg-amber-900/40 rounded-full overflow-hidden">
             <div
               className="h-full bg-amber-400 rounded-full transition-all duration-700"
-              style={{
-                width: `${(current / nextMilestone) * 100}%`,
-              }}
+              style={{ width: `${(current / nextMilestone) * 100}%` }}
             />
           </div>
           <p className="text-xs text-amber-500 mt-1 text-right">

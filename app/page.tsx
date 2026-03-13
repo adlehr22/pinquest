@@ -8,16 +8,17 @@ import { getStreakData, isStreakAtRisk } from '@/utils/streak'
 import { getTodayDateString } from '@/utils/daily'
 import { hasPlayedToday, getTodayResult } from '@/utils/storage'
 import AuthModal from '@/components/AuthModal'
+import ThemeToggle from '@/components/ThemeToggle'
 
 function HowToPlayModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={onClose}>
       <div
-        className="bg-white rounded-t-3xl w-full max-w-md p-6 pb-10 space-y-4 animate-slideUp"
+        className="bg-white dark:bg-[#162130] rounded-t-3xl w-full max-w-md p-6 pb-10 space-y-4 animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-2" />
-        <h2 className="text-xl font-black text-gray-900">How to Play</h2>
+        <div className="w-10 h-1 bg-gray-200 dark:bg-slate-600 rounded-full mx-auto mb-2" />
+        <h2 className="text-xl font-black text-gray-900 dark:text-slate-100">How to Play</h2>
         <div className="space-y-3">
           {[
             { icon: '🌍', title: 'Daily Challenge', desc: 'Everyone gets the same 5 locations each day.' },
@@ -30,8 +31,8 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
             <div key={item.title} className="flex gap-3 items-start">
               <span className="text-2xl">{item.icon}</span>
               <div>
-                <p className="font-bold text-gray-800 text-sm">{item.title}</p>
-                <p className="text-gray-500 text-sm">{item.desc}</p>
+                <p className="font-bold text-gray-800 dark:text-slate-200 text-sm">{item.title}</p>
+                <p className="text-gray-500 dark:text-slate-400 text-sm">{item.desc}</p>
               </div>
             </div>
           ))}
@@ -79,22 +80,23 @@ export default function HomePage() {
   const handleViewResults = () => router.push('/game')
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white flex flex-col items-center justify-center px-6 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-[#0f1923] dark:to-[#0f1923] flex flex-col items-center justify-center px-6 py-8 transition-colors duration-200">
       {showHowTo && <HowToPlayModal onClose={() => setShowHowTo(false)} />}
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
       <div className="w-full max-w-sm space-y-6 text-center">
-        {/* Top bar: leaderboard + profile */}
+        {/* Top bar: leaderboard + profile + theme toggle */}
         <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/leaderboard')}
-            className="text-xs font-bold text-gray-400 hover:text-sky-500 transition-colors flex items-center gap-1"
+            className="text-xs font-bold text-gray-400 dark:text-slate-500 hover:text-sky-500 transition-colors flex items-center gap-1"
           >
             🏆 Leaderboard
           </button>
+          <ThemeToggle />
           <button
             onClick={() => router.push('/profile')}
-            className="text-xs font-bold text-gray-400 hover:text-sky-500 transition-colors flex items-center gap-1"
+            className="text-xs font-bold text-gray-400 dark:text-slate-500 hover:text-sky-500 transition-colors flex items-center gap-1"
           >
             {user ? `👤 ${profile?.username ?? 'Profile'}` : '👤 Profile'}
           </button>
@@ -102,7 +104,7 @@ export default function HomePage() {
 
         {/* App icon */}
         <div className="flex justify-center">
-          <div className="w-24 h-24 bg-sky-400 rounded-[28px] flex items-center justify-center shadow-2xl shadow-sky-200">
+          <div className="w-24 h-24 bg-sky-400 rounded-[28px] flex items-center justify-center shadow-2xl shadow-sky-200 dark:shadow-sky-900">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="40" height="60" className="drop-shadow-sm">
               <path d="M12 0C5.373 0 0 5.373 0 12c0 8.25 12 24 12 24S24 20.25 24 12C24 5.373 18.627 0 12 0z" fill="white" />
               <circle cx="12" cy="12" r="5" fill="#38BDF8" />
@@ -112,25 +114,25 @@ export default function HomePage() {
 
         {/* Title */}
         <div className="space-y-1">
-          <h1 className="text-5xl font-black text-gray-900 tracking-tight">PinQuest</h1>
-          <p className="text-gray-500 font-medium">Daily Geography Challenge</p>
-          <p className="text-gray-400 text-sm">{today}</p>
+          <h1 className="text-5xl font-black text-gray-900 dark:text-slate-100 tracking-tight">PinQuest</h1>
+          <p className="text-gray-500 dark:text-slate-400 font-medium">Daily Geography Challenge</p>
+          <p className="text-gray-400 dark:text-slate-500 text-sm">{today}</p>
         </div>
 
         {/* Streak at risk warning */}
         {atRisk && streakData.current > 0 && !playedToday && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-sm font-semibold text-red-600">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-2xl px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400">
             ⚠️ Streak at risk! Play before midnight to keep your 🔥 {streakData.current} day streak.
           </div>
         )}
 
         {/* Played today state */}
         {playedToday && todayScore !== null ? (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 space-y-1">
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl px-5 py-4 space-y-1">
             <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest">Today&apos;s Score</p>
-            <p className="text-3xl font-black text-emerald-600 tabular-nums">
+            <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
               {todayScore.toLocaleString()}
-              <span className="text-base font-semibold text-emerald-400"> / 5,000</span>
+              <span className="text-base font-semibold text-emerald-400 dark:text-emerald-600"> / 5,000</span>
             </p>
             {streakData.current > 0 && (
               <p className="text-sm text-emerald-500 font-semibold">🔥 {streakData.current} day streak</p>
@@ -138,22 +140,20 @@ export default function HomePage() {
           </div>
         ) : (
           <>
-            {/* Streak nudge for logged-in users */}
             {user && streakData.current > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-                <p className="text-sm font-bold text-amber-600">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl px-4 py-3">
+                <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
                   🔥 {streakData.current} day streak — keep it going!
                 </p>
               </div>
             )}
 
-            {/* Personal best */}
             {personalBest !== null && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl px-5 py-4">
                 <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Personal Best</p>
-                <p className="text-3xl font-black text-amber-600">
+                <p className="text-3xl font-black text-amber-600 dark:text-amber-400">
                   {personalBest.toLocaleString()}
-                  <span className="text-base font-semibold text-amber-400"> / 5,000</span>
+                  <span className="text-base font-semibold text-amber-400 dark:text-amber-600"> / 5,000</span>
                 </p>
               </div>
             )}
@@ -161,8 +161,8 @@ export default function HomePage() {
         )}
 
         {/* Scoring guide */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 text-left space-y-2">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center mb-3">Scoring</p>
+        <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] shadow-sm px-5 py-4 text-left space-y-2">
+          <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest text-center mb-3">Scoring</p>
           {[
             { label: 'PERFECT', pts: '1,000 pts', color: 'text-emerald-500', dist: '< 6 mi' },
             { label: 'GREAT', pts: '700–900 pts', color: 'text-sky-500', dist: '6–125 mi' },
@@ -171,8 +171,8 @@ export default function HomePage() {
           ].map((row) => (
             <div key={row.label} className="flex items-center justify-between">
               <span className={`text-sm font-bold ${row.color}`}>{row.label}</span>
-              <span className="text-xs text-gray-400">{row.dist}</span>
-              <span className="text-xs font-semibold text-gray-600">{row.pts}</span>
+              <span className="text-xs text-gray-400 dark:text-slate-500">{row.dist}</span>
+              <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">{row.pts}</span>
             </div>
           ))}
         </div>
@@ -183,23 +183,23 @@ export default function HomePage() {
             <>
               <button
                 onClick={handleViewResults}
-                className="w-full py-4 bg-sky-400 text-white text-lg font-black rounded-full shadow-xl shadow-sky-200 hover:bg-sky-500 active:scale-[0.98] transition-all"
+                className="w-full py-4 bg-sky-400 text-white text-lg font-black rounded-full shadow-xl shadow-sky-200 dark:shadow-sky-900/50 hover:bg-sky-500 active:scale-[0.98] transition-all"
               >
                 View Today&apos;s Results →
               </button>
-              <p className="text-xs text-gray-400">New challenge available at midnight</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500">New challenge available at midnight</p>
             </>
           ) : (
             <button
               onClick={handlePlay}
-              className="w-full py-4 bg-sky-400 text-white text-lg font-black rounded-full shadow-xl shadow-sky-200 hover:bg-sky-500 active:scale-[0.98] transition-all"
+              className="w-full py-4 bg-sky-400 text-white text-lg font-black rounded-full shadow-xl shadow-sky-200 dark:shadow-sky-900/50 hover:bg-sky-500 active:scale-[0.98] transition-all"
             >
               Drop Today&apos;s Pins →
             </button>
           )}
           <button
             onClick={() => setShowHowTo(true)}
-            className="w-full py-3.5 bg-white border-2 border-gray-200 text-gray-600 text-sm font-bold rounded-full hover:bg-gray-50 transition-colors"
+            className="w-full py-3.5 bg-white dark:bg-[#162130] border-2 border-gray-200 dark:border-[#1e3a4a] text-gray-600 dark:text-slate-300 text-sm font-bold rounded-full hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
             How to Play
           </button>
@@ -209,13 +209,13 @@ export default function HomePage() {
         {!user && (
           <button
             onClick={() => setShowAuth(true)}
-            className="text-xs text-gray-400 hover:text-sky-500 transition-colors"
+            className="text-xs text-gray-400 dark:text-slate-500 hover:text-sky-500 transition-colors"
           >
             Login to save your streak across devices →
           </button>
         )}
 
-        <p className="text-xs text-gray-300">5 rounds · 5,000 points possible · Free forever</p>
+        <p className="text-xs text-gray-300 dark:text-slate-600">5 rounds · 5,000 points possible · Free forever</p>
       </div>
     </div>
   )

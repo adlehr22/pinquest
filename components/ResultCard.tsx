@@ -40,7 +40,6 @@ export default function ResultCard({
   isLastRound,
   visible,
 }: ResultCardProps) {
-  // Section 3: score counts up in 400ms
   const [animatedScore, setAnimatedScore] = useState(0)
   const rafRef = useRef<number | null>(null)
 
@@ -63,55 +62,49 @@ export default function ResultCard({
 
   const ratingColor  = getRatingColor(result.rating)
   const progressPct  = Math.min((result.pointsTotal / 1000) * 100, 100)
-  // Section 4: whole-number distance
   const distStr      = formatDistanceWhole(result.distanceMiles, result.distanceKm, unitPreference)
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-20"
+      className="fixed bottom-0 left-0 right-0 bg-white dark:bg-[#162130] rounded-t-2xl shadow-2xl z-20 transition-colors duration-200"
       style={{
         transform: visible ? 'translateY(0)' : 'translateY(100%)',
-        // Section 5: transform-only transition — no layout reflow
         transition: 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
         paddingBottom: 'env(safe-area-inset-bottom)',
-        // Section 5: force GPU layer
         willChange: 'transform',
       }}
     >
       {/* Drag handle */}
-      <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-2" />
+      <div className="w-10 h-1 bg-gray-200 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-2" />
 
-      {/* Section 1: streak banner stays if present */}
       <StreakBanner streak={streakCount} />
 
       <div className="px-4 pb-4 space-y-2.5 max-w-md mx-auto w-full">
-        {/* Section 3 & 4: rating label — ratingFade animation, emoji suffix */}
+        {/* Rating label */}
         <div className="text-center py-1">
-          <span
-            className={`rating-label text-3xl font-black tracking-tight ${ratingColor}`}
-          >
+          <span className={`rating-label text-3xl font-black tracking-tight ${ratingColor}`}>
             {result.rating} {RATING_EMOJI[result.rating]}
           </span>
         </div>
 
-        {/* Section 4: single-line stat — whole numbers, no decimals */}
-        <p className="text-center text-sm font-semibold text-gray-600">
+        {/* Distance stat */}
+        <p className="text-center text-sm font-semibold text-gray-600 dark:text-slate-300">
           {distStr} away
           {result.pointsBonus > 0 && (
             <span className="text-amber-500"> · +{result.pointsBonus} streak bonus</span>
           )}
         </p>
 
-        {/* Section 3: score count — animated number */}
+        {/* Animated score */}
         <div className="flex items-center justify-center gap-1">
           <span className={`text-4xl font-black tabular-nums ${ratingColor}`}>
             {animatedScore.toLocaleString()}
           </span>
-          <span className="text-gray-400 text-base font-semibold self-end mb-1">pts</span>
+          <span className="text-gray-400 dark:text-slate-500 text-base font-semibold self-end mb-1">pts</span>
         </div>
 
-        {/* Progress bar — GPU-safe width transition */}
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        {/* Progress bar */}
+        <div className="h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full ${PROGRESS_COLOR[result.rating]}`}
             style={{
@@ -122,24 +115,23 @@ export default function ResultCard({
         </div>
 
         {result.hintUsed && (
-          <p className="text-xs text-purple-500 font-medium text-center">Hint used this round</p>
+          <p className="text-xs text-purple-500 dark:text-purple-400 font-medium text-center">Hint used this round</p>
         )}
 
-        {/* Fun fact — compact */}
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-          <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-0.5">
+        {/* Fun fact */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl px-3 py-2.5">
+          <p className="text-xs font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wide mb-0.5">
             Did you know?
           </p>
-          <p className="text-xs text-gray-600 leading-relaxed">{location.funFact}</p>
+          <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">{location.funFact}</p>
         </div>
 
-        {/* Section 1: Next button full-width, 44px+ touch target */}
+        {/* Next button */}
         <button
           onClick={onNext}
-          // Section 3: button press feedback via active:scale-95
           className="w-full py-3.5 rounded-2xl bg-sky-400 text-white font-bold text-sm
                      hover:bg-sky-500 active:scale-95 transition-transform duration-100
-                     shadow-md shadow-sky-200 min-h-[44px]"
+                     shadow-md shadow-sky-200 dark:shadow-sky-900/50 min-h-[44px]"
         >
           {isLastRound ? 'See Results →' : 'Next Round →'}
         </button>

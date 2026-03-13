@@ -62,3 +62,17 @@ body {
 .fixed {
   -webkit-transform: translateZ(0);
 }
+
+/* ── Dark mode Leaflet overrides ─────────────────────── */
+.dark .leaflet-container {
+  background: #0d2137;
+}
+
+.dark .leaflet-control-attribution {
+  background: rgba(15, 25, 35, 0.7) !important;
+  color: #64748b !important;
+}
+
+.dark .leaflet-control-attribution a {
+  color: #38BDF8 !important;
+}

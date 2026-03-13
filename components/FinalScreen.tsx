@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useTheme } from 'next-themes'
 import { RoundResult, Location } from '@/types'
 import { formatDistanceWhole } from '@/utils/distance'
 import { isNewPersonalBest, setPersonalBest } from '@/utils/storage'
 import { buildShareText, shareResult } from '@/utils/share'
+import { generateShareImage, shareOrDownloadImage } from '@/utils/shareImage'
 import StreakCard from './StreakCard'
 import Toast from './Toast'
 import { useAuth } from '@/lib/AuthContext'
@@ -29,7 +31,6 @@ async function fireConfetti() {
   confetti?.({ particleCount: 100, spread: 70, origin: { y: 0.5 } })
 }
 
-// Section 4: one-line performance summary
 function getPerformanceSummary(score: number): string {
   if (score === 5000) return 'Perfect game! 🏆'
   if (score >= 4000) return 'Excellent! 🌟'
@@ -70,10 +71,16 @@ export default function FinalScreen({
   onAuthPrompt,
 }: FinalScreenProps) {
   const { user } = useAuth()
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+
   const [newBest, setNewBest] = useState(false)
   const [animatedScore, setAnimatedScore] = useState(0)
   const [toastVisible, setToastVisible] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
+  const [shareModal, setShareModal] = useState(false)
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null)
+  const [shareGenerating, setShareGenerating] = useState(false)
   const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -81,7 +88,6 @@ export default function FinalScreen({
       setNewBest(true)
       setPersonalBest(totalScore)
     }
-    // Section 3: total score animates from 0 in 1800ms using rAF
     const duration = 1800
     const start = performance.now()
     const tick = (now: number) => {
@@ -101,8 +107,49 @@ export default function FinalScreen({
     return () => clearTimeout(t)
   }, [newBest, onAuthPrompt])
 
+  // Open modal and generate image
   const handleShare = useCallback(async () => {
     trackShareClicked(user?.id ?? null, totalScore, dateStr)
+    setShareImageUrl(null)
+    setShareGenerating(true)
+    setShareModal(true)
+    try {
+      const canvas = generateShareImage(results, locations, totalScore, dateStr, dayStreak, isDark)
+      if (canvas) setShareImageUrl(canvas.toDataURL('image/png'))
+    } catch {
+      // silently fall through — modal still shows "Copy Text Instead"
+    }
+    setShareGenerating(false)
+  }, [results, locations, totalScore, dateStr, dayStreak, isDark, user])
+
+  // Share or download the image
+  const handleShareImage = useCallback(async () => {
+    setShareModal(false)
+    const plainText = buildShareText(results, locations, totalScore, dateStr, dayStreak, unitPreference, 'standard')
+    try {
+      const canvas = generateShareImage(results, locations, totalScore, dateStr, dayStreak, isDark)
+      if (!canvas) throw new Error('no canvas')
+      const outcome = await shareOrDownloadImage(canvas, dateStr, plainText)
+      if (outcome === 'downloaded') {
+        setToastMsg('Image saved!')
+        setToastVisible(true)
+      } else if (outcome === 'text') {
+        setToastMsg('✓ Copied to clipboard!')
+        setToastVisible(true)
+      }
+    } catch {
+      // Fall back to plain text
+      const outcome = await shareResult(plainText)
+      if (outcome === 'clipboard') {
+        setToastMsg('✓ Copied to clipboard!')
+        setToastVisible(true)
+      }
+    }
+  }, [results, locations, totalScore, dateStr, dayStreak, unitPreference, isDark])
+
+  // Copy plain text to clipboard
+  const handleCopyText = useCallback(async () => {
+    setShareModal(false)
     const text = buildShareText(results, locations, totalScore, dateStr, dayStreak, unitPreference, 'standard')
     const outcome = await shareResult(text)
     if (outcome === 'clipboard') {
@@ -117,8 +164,63 @@ export default function FinalScreen({
   const maxScore = results.length * 1000
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0f1923] flex flex-col transition-colors duration-200">
       <Toast message={toastMsg} visible={toastVisible} onHide={() => setToastVisible(false)} />
+
+      {/* Share Image Modal */}
+      {shareModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center"
+          onClick={() => setShareModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-[#162130] rounded-t-3xl w-full max-w-md p-6 pb-10 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-gray-200 dark:bg-slate-600 rounded-full mx-auto mb-2" />
+            <p className="text-center font-bold text-gray-800 dark:text-slate-100 text-lg">Share Your Result</p>
+
+            {/* Image preview */}
+            <div className="w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-[#1e3a4a] bg-gray-50 dark:bg-slate-800 min-h-[120px] flex items-center justify-center">
+              {shareGenerating ? (
+                <p className="text-gray-400 dark:text-slate-500 text-sm py-10">Generating…</p>
+              ) : shareImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={shareImageUrl} alt="Share card preview" className="w-full" />
+              ) : (
+                <p className="text-gray-400 dark:text-slate-500 text-sm py-10">Preview unavailable</p>
+              )}
+            </div>
+
+            <button
+              onClick={handleShareImage}
+              disabled={shareGenerating}
+              className="w-full py-3.5 rounded-2xl bg-sky-400 text-white font-bold
+                         active:scale-95 transition-transform duration-100
+                         shadow-md shadow-sky-200 dark:shadow-sky-900/50
+                         disabled:opacity-50 min-h-[44px]"
+            >
+              Share Image 🖼️
+            </button>
+
+            <button
+              onClick={handleCopyText}
+              className="w-full py-3 rounded-2xl border border-gray-200 dark:border-[#1e3a4a]
+                         text-gray-600 dark:text-slate-300 font-semibold
+                         active:scale-95 transition-transform duration-100 min-h-[44px]"
+            >
+              Copy Text Instead
+            </button>
+
+            <button
+              onClick={() => setShareModal(false)}
+              className="w-full py-2 text-gray-400 dark:text-slate-500 text-sm font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Map — 35vh */}
       <div style={{ height: '35vh', minHeight: 180 }} className="relative flex-shrink-0">
@@ -136,17 +238,15 @@ export default function FinalScreen({
         />
         {/* Score overlay */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-xl text-center">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+          <div className="bg-white/90 dark:bg-[#162130]/95 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-xl text-center border border-transparent dark:border-[#1e3a4a]">
+            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1">
               Final Score
             </p>
-            {/* Section 3: animated total score */}
-            <p className="text-4xl font-black text-gray-900 tabular-nums">
+            <p className="text-4xl font-black text-gray-900 dark:text-slate-100 tabular-nums">
               {animatedScore.toLocaleString()}
-              <span className="text-base font-semibold text-gray-400"> / {maxScore.toLocaleString()}</span>
+              <span className="text-base font-semibold text-gray-400 dark:text-slate-500"> / {maxScore.toLocaleString()}</span>
             </p>
-            {/* Section 4: performance summary */}
-            <p className="text-sm font-bold text-gray-500 mt-1">
+            <p className="text-sm font-bold text-gray-500 dark:text-slate-400 mt-1">
               {getPerformanceSummary(totalScore)}
             </p>
             {newBest && (
@@ -163,48 +263,47 @@ export default function FinalScreen({
           <StreakCard current={dayStreak} longest={longestStreak} onMilestone={() => fireConfetti()} />
         )}
 
-        {/* Round breakdown — Section 4: whole number distances */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="grid grid-cols-4 px-4 py-2 bg-gray-50 border-b border-gray-100">
-            <p className="text-xs font-bold text-gray-400 uppercase">#</p>
-            <p className="text-xs font-bold text-gray-400 uppercase col-span-2">Location</p>
-            <p className="text-xs font-bold text-gray-400 uppercase text-right">Pts</p>
+        {/* Round breakdown */}
+        <div className="bg-white dark:bg-[#162130] rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-[#1e3a4a]">
+          <div className="grid grid-cols-4 px-4 py-2 bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-[#1e3a4a]">
+            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase">#</p>
+            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase col-span-2">Location</p>
+            <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase text-right">Pts</p>
           </div>
           {results.map((result, i) => {
             const loc = locations.find((l) => l.id === result.locationId)
-            // Section 4: whole number distance
             const distStr = formatDistanceWhole(result.distanceMiles, result.distanceKm, unitPreference)
             return (
-              <div key={i} className="grid grid-cols-4 px-4 py-2.5 border-b border-gray-50 last:border-0">
-                <p className="text-sm font-bold text-gray-400">{i + 1}</p>
+              <div key={i} className="grid grid-cols-4 px-4 py-2.5 border-b border-gray-50 dark:border-[#1e3a4a] last:border-0">
+                <p className="text-sm font-bold text-gray-400 dark:text-slate-500">{i + 1}</p>
                 <div className="col-span-2">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{loc?.name}</p>
-                  <p className="text-xs text-gray-400">{distStr}</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-slate-200 truncate">{loc?.name}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">{distStr}</p>
                 </div>
                 <div className="text-right">
                   <p className={`text-sm font-bold ${RATING_COLORS[result.rating]}`}>
                     {result.pointsTotal}
                   </p>
-                  <p className="text-xs text-gray-400">{result.rating}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">{result.rating}</p>
                 </div>
               </div>
             )
           })}
         </div>
 
-        {/* Section 2 & 3: Share button with press feedback */}
+        {/* Share button */}
         <button
           onClick={handleShare}
           className="w-full py-3.5 min-h-[44px] rounded-2xl bg-sky-400 text-white font-bold
                      hover:bg-sky-500 active:scale-95 transition-transform duration-100
-                     shadow-md shadow-sky-200"
+                     shadow-md shadow-sky-200 dark:shadow-sky-900/50"
         >
           Share My Result 📤
         </button>
 
         {/* Countdown */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 text-center space-y-1">
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
+        <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] shadow-sm px-5 py-4 text-center space-y-1">
+          <p className="text-xs text-gray-400 dark:text-slate-500 font-medium uppercase tracking-widest">
             Next challenge in
           </p>
           <CountdownInline />
@@ -212,8 +311,8 @@ export default function FinalScreen({
 
         <button
           onClick={onHome}
-          className="w-full py-3.5 min-h-[44px] rounded-2xl bg-white border border-gray-200
-                     text-gray-600 font-semibold hover:bg-gray-50
+          className="w-full py-3.5 min-h-[44px] rounded-2xl bg-white dark:bg-[#162130] border border-gray-200 dark:border-[#1e3a4a]
+                     text-gray-600 dark:text-slate-300 font-semibold hover:bg-gray-50 dark:hover:bg-slate-800
                      active:scale-95 transition-transform duration-100"
         >
           ← Back to Home
@@ -223,11 +322,11 @@ export default function FinalScreen({
         <div className="flex items-center justify-center gap-6 pb-2">
           <div className="flex items-center gap-1.5">
             <span className="text-amber-400 text-lg">📍</span>
-            <span className="text-xs text-gray-500">Your guesses</span>
+            <span className="text-xs text-gray-500 dark:text-slate-400">Your guesses</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-sky-400 text-lg">📍</span>
-            <span className="text-xs text-gray-500">Correct answers</span>
+            <span className="text-xs text-gray-500 dark:text-slate-400">Correct answers</span>
           </div>
         </div>
       </div>
@@ -258,6 +357,6 @@ function CountdownInline() {
   const s = Math.floor((ms % 60000) / 1000)
   const fmt = (n: number) => String(n).padStart(2, '0')
   return (
-    <p className="text-3xl font-black text-gray-800 tabular-nums">{fmt(h)}:{fmt(m)}:{fmt(s)}</p>
+    <p className="text-3xl font-black text-gray-800 dark:text-slate-100 tabular-nums">{fmt(h)}:{fmt(m)}:{fmt(s)}</p>
   )
 }

@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, useMap } from 
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { RoundResult, Location } from '@/types'
+import { useTheme } from 'next-themes'
 
 // Fix Leaflet default icon bug
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -56,7 +57,6 @@ interface ClickHandlerProps {
   onFirstInteraction: () => void
 }
 
-// Section 5: memo prevents re-render when parent re-renders with same props
 const ClickHandler = memo(function ClickHandler({ locked, onMapClick, onFirstInteraction }: ClickHandlerProps) {
   const interacted = useRef(false)
   useMapEvents({
@@ -118,6 +118,25 @@ const ResetView = memo(function ResetView({ trigger }: { trigger: number }) {
   return null
 })
 
+// ── Tile layer that reacts to theme changes ────────────
+
+const LIGHT_TILES = 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png'
+const DARK_TILES  = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
+const TILE_ATTR   = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+
+// Wrapper so TileLayer key changes when theme flips, forcing a fresh layer
+const ThemedTileLayer = memo(function ThemedTileLayer({ isDark }: { isDark: boolean }) {
+  return (
+    <TileLayer
+      key={isDark ? 'dark' : 'light'}
+      url={isDark ? DARK_TILES : LIGHT_TILES}
+      attribution={TILE_ATTR}
+      subdomains="abcd"
+      maxZoom={19}
+    />
+  )
+})
+
 // ── Final pair — memoized, only re-renders if props change ──
 
 const MapFinalPair = memo(function MapFinalPair({
@@ -151,7 +170,6 @@ interface MapProps {
   allLocations?: Location[]
 }
 
-// Section 5: memo — only re-renders when map-relevant props change
 const GameMap = memo(function GameMap({
   targetLocation,
   guessLat,
@@ -166,6 +184,8 @@ const GameMap = memo(function GameMap({
   allLocations = [],
 }: MapProps) {
   const [showHint, setShowHint] = useState(true)
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   const handleFirstInteraction = useCallback(() => setShowHint(false), [])
   const handleMapClick = useCallback((lat: number, lng: number) => onGuess(lat, lng), [onGuess])
@@ -175,7 +195,6 @@ const GameMap = memo(function GameMap({
   return (
     <div
       className="relative w-full h-full"
-      // Section 5: prevent iOS scroll conflict during map pan/pinch
       style={{ touchAction: 'none' }}
     >
       {/* Hint overlay */}
@@ -196,12 +215,7 @@ const GameMap = memo(function GameMap({
         attributionControl={true}
         key={`map-${roundKey}`}
       >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          subdomains="abcd"
-          maxZoom={19}
-        />
+        <ThemedTileLayer isDark={isDark} />
 
         {!finalMode && (
           <>
