@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { RoundResult, Location } from '@/types'
-import { getRatingColor, getRatingBg } from '@/utils/scoring'
-import { formatDistance } from '@/utils/distance'
+import { getRatingColor } from '@/utils/scoring'
+import { formatDistanceWhole } from '@/utils/distance'
 import StreakBanner from './StreakBanner'
 
 interface ResultCardProps {
@@ -16,6 +16,21 @@ interface ResultCardProps {
   visible: boolean
 }
 
+// Section 4: rating with contextual emoji
+const RATING_EMOJI: Record<string, string> = {
+  PERFECT: '🎯',
+  GREAT:   '🌍',
+  GOOD:    '🗺️',
+  BAD:     '😬',
+}
+
+const PROGRESS_COLOR: Record<string, string> = {
+  PERFECT: 'bg-emerald-400',
+  GREAT:   'bg-sky-400',
+  GOOD:    'bg-amber-400',
+  BAD:     'bg-red-400',
+}
+
 export default function ResultCard({
   result,
   location,
@@ -25,125 +40,109 @@ export default function ResultCard({
   isLastRound,
   visible,
 }: ResultCardProps) {
+  // Section 3: score counts up in 400ms
   const [animatedScore, setAnimatedScore] = useState(0)
   const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!visible) return
     const target = result.pointsTotal
-    const duration = 1500
+    const duration = 400
     const start = performance.now()
 
     const tick = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
+      const progress = Math.min((now - start) / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
       setAnimatedScore(Math.round(eased * target))
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(tick)
-      }
+      if (progress < 1) rafRef.current = requestAnimationFrame(tick)
     }
 
     rafRef.current = requestAnimationFrame(tick)
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-    }
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }
   }, [visible, result.pointsTotal])
 
-  const distanceStr = formatDistance(result.distanceMiles, result.distanceKm, unitPreference)
-  const ratingColor = getRatingColor(result.rating)
-  const ratingBg = getRatingBg(result.rating)
-  const progressPct = (result.pointsTotal / 1000) * 100
+  const ratingColor  = getRatingColor(result.rating)
+  const progressPct  = Math.min((result.pointsTotal / 1000) * 100, 100)
+  // Section 4: whole-number distance
+  const distStr      = formatDistanceWhole(result.distanceMiles, result.distanceKm, unitPreference)
 
   return (
     <div
       className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-20"
       style={{
         transform: visible ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 0.35s ease-out',
+        // Section 5: transform-only transition — no layout reflow
+        transition: 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
         paddingBottom: 'env(safe-area-inset-bottom)',
+        // Section 5: force GPU layer
+        willChange: 'transform',
       }}
     >
-      <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-3" />
+      {/* Drag handle */}
+      <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-2" />
 
+      {/* Section 1: streak banner stays if present */}
       <StreakBanner streak={streakCount} />
 
-      <div className="px-5 pb-6 space-y-3">
-        {/* Rating */}
-        <div className={`rounded-xl border p-3 ${ratingBg}`}>
-          <p className={`text-2xl font-black text-center animate-ratingBounce ${ratingColor}`}>
-            {result.rating}
-          </p>
+      <div className="px-4 pb-4 space-y-2.5 max-w-md mx-auto w-full">
+        {/* Section 3 & 4: rating label — ratingFade animation, emoji suffix */}
+        <div className="text-center py-1">
+          <span
+            className={`rating-label text-3xl font-black tracking-tight ${ratingColor}`}
+          >
+            {result.rating} {RATING_EMOJI[result.rating]}
+          </span>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-base font-bold text-gray-900 leading-tight">{distanceStr}</p>
-            <p className="text-xs text-gray-400 font-medium mt-0.5">distance</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-base font-bold text-sky-500 tabular-nums leading-tight">
-              {animatedScore}
-            </p>
-            <p className="text-xs text-gray-400 font-medium mt-0.5">pts earned</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-base font-bold text-gray-900 tabular-nums leading-tight">
-              {result.pointsBonus > 0 ? (
-                <span className="text-amber-500">+{result.pointsBonus}</span>
-              ) : (
-                <span className="text-gray-300">—</span>
-              )}
-            </p>
-            <p className="text-xs text-gray-400 font-medium mt-0.5">streak bonus</p>
-          </div>
+        {/* Section 4: single-line stat — whole numbers, no decimals */}
+        <p className="text-center text-sm font-semibold text-gray-600">
+          {distStr} away
+          {result.pointsBonus > 0 && (
+            <span className="text-amber-500"> · +{result.pointsBonus} streak bonus</span>
+          )}
+        </p>
+
+        {/* Section 3: score count — animated number */}
+        <div className="flex items-center justify-center gap-1">
+          <span className={`text-4xl font-black tabular-nums ${ratingColor}`}>
+            {animatedScore.toLocaleString()}
+          </span>
+          <span className="text-gray-400 text-base font-semibold self-end mb-1">pts</span>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        {/* Progress bar — GPU-safe width transition */}
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-1000 ease-out ${
-              result.rating === 'PERFECT'
-                ? 'bg-emerald-400'
-                : result.rating === 'GREAT'
-                ? 'bg-sky-400'
-                : result.rating === 'GOOD'
-                ? 'bg-amber-400'
-                : 'bg-red-400'
-            }`}
-            style={{ width: `${progressPct}%` }}
+            className={`h-full rounded-full ${PROGRESS_COLOR[result.rating]}`}
+            style={{
+              width: `${progressPct}%`,
+              transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
           />
         </div>
 
-        {/* Hint badge */}
         {result.hintUsed && (
-          <p className="text-xs text-purple-500 font-medium text-center">
-            Hint was used this round
-          </p>
+          <p className="text-xs text-purple-500 font-medium text-center">Hint used this round</p>
         )}
 
-        {/* Fun fact */}
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-          <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">
+        {/* Fun fact — compact */}
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+          <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-0.5">
             Did you know?
           </p>
-          <p className="text-sm text-gray-700 leading-relaxed">{location.funFact}</p>
+          <p className="text-xs text-gray-600 leading-relaxed">{location.funFact}</p>
         </div>
 
-        {/* Bottom bar */}
-        <div className="flex items-center justify-between pt-1">
-          <div>
-            <p className="text-xs text-gray-400">You found</p>
-            <p className="text-sm font-bold text-gray-800">{location.name}</p>
-          </div>
-          <button
-            onClick={onNext}
-            className="bg-sky-400 text-white font-bold px-5 py-3 rounded-xl hover:bg-sky-500 transition-colors shadow-md shadow-sky-200 text-sm"
-          >
-            {isLastRound ? 'See Results →' : 'Next Round →'}
-          </button>
-        </div>
+        {/* Section 1: Next button full-width, 44px+ touch target */}
+        <button
+          onClick={onNext}
+          // Section 3: button press feedback via active:scale-95
+          className="w-full py-3.5 rounded-2xl bg-sky-400 text-white font-bold text-sm
+                     hover:bg-sky-500 active:scale-95 transition-transform duration-100
+                     shadow-md shadow-sky-200 min-h-[44px]"
+        >
+          {isLastRound ? 'See Results →' : 'Next Round →'}
+        </button>
       </div>
     </div>
   )

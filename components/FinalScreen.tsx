@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { RoundResult, Location } from '@/types'
-import { formatDistance } from '@/utils/distance'
+import { formatDistanceWhole } from '@/utils/distance'
 import { isNewPersonalBest, setPersonalBest } from '@/utils/storage'
 import { buildShareText, shareResult } from '@/utils/share'
 import StreakCard from './StreakCard'
@@ -14,8 +14,7 @@ const GameMap = dynamic(() => import('./Map'), { ssr: false })
 async function fireConfetti() {
   if (typeof window === 'undefined') return
   const src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js'
-  const existing = document.querySelector(`script[src="${src}"]`)
-  if (!existing) {
+  if (!document.querySelector(`script[src="${src}"]`)) {
     await new Promise<void>((res) => {
       const s = document.createElement('script')
       s.src = src
@@ -26,6 +25,15 @@ async function fireConfetti() {
   }
   const confetti = (window as unknown as { confetti?: (o: unknown) => void }).confetti
   confetti?.({ particleCount: 100, spread: 70, origin: { y: 0.5 } })
+}
+
+// Section 4: one-line performance summary
+function getPerformanceSummary(score: number): string {
+  if (score === 5000) return 'Perfect game! 🏆'
+  if (score >= 4000) return 'Excellent! 🌟'
+  if (score >= 3000) return 'Great job! 🎯'
+  if (score >= 2000) return 'Not bad! 🗺️'
+  return 'Keep practicing! 💪'
 }
 
 interface FinalScreenProps {
@@ -41,6 +49,13 @@ interface FinalScreenProps {
   onAuthPrompt: () => void
 }
 
+const RATING_COLORS: Record<string, string> = {
+  PERFECT: 'text-emerald-500',
+  GREAT:   'text-sky-500',
+  GOOD:    'text-amber-500',
+  BAD:     'text-red-400',
+}
+
 export default function FinalScreen({
   results,
   locations,
@@ -49,7 +64,6 @@ export default function FinalScreen({
   dayStreak,
   longestStreak,
   dateStr,
-  onPlayAgain,
   onHome,
   onAuthPrompt,
 }: FinalScreenProps) {
@@ -64,7 +78,7 @@ export default function FinalScreen({
       setNewBest(true)
       setPersonalBest(totalScore)
     }
-
+    // Section 3: total score animates from 0 in 1800ms using rAF
     const duration = 1800
     const start = performance.now()
     const tick = (now: number) => {
@@ -76,7 +90,6 @@ export default function FinalScreen({
     return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }
   }, [totalScore])
 
-  // Milestone confetti & auth prompt after score animates
   useEffect(() => {
     const t = setTimeout(() => {
       if (newBest) fireConfetti()
@@ -86,33 +99,25 @@ export default function FinalScreen({
   }, [newBest, onAuthPrompt])
 
   const handleShare = useCallback(async () => {
-    const text = buildShareText(results, locations, totalScore, dateStr, dayStreak, unitPreference)
+    const text = buildShareText(results, locations, totalScore, dateStr, dayStreak, unitPreference, 'standard')
     const outcome = await shareResult(text)
     if (outcome === 'clipboard') {
       setToastMsg('✓ Copied to clipboard!')
       setToastVisible(true)
-    } else if (outcome === 'native') {
-      // native sheet handled it
-    } else {
-      setToastMsg('Could not share. Try again.')
+    } else if (outcome === 'error') {
+      setToastMsg('Could not share — try again.')
       setToastVisible(true)
     }
   }, [results, locations, totalScore, dateStr, dayStreak, unitPreference])
 
   const maxScore = results.length * 1000
-  const ratingColors: Record<string, string> = {
-    PERFECT: 'text-emerald-500',
-    GREAT: 'text-sky-500',
-    GOOD: 'text-amber-500',
-    BAD: 'text-red-400',
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Toast message={toastMsg} visible={toastVisible} onHide={() => setToastVisible(false)} />
 
-      {/* Map */}
-      <div style={{ height: '35vh' }} className="relative">
+      {/* Map — 35vh */}
+      <div style={{ height: '35vh', minHeight: 180 }} className="relative flex-shrink-0">
         <GameMap
           targetLocation={locations[0]}
           guessLat={null}
@@ -125,36 +130,36 @@ export default function FinalScreen({
           allResults={results}
           allLocations={locations}
         />
+        {/* Score overlay */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-6 py-4 shadow-xl text-center">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-xl text-center">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
               Final Score
             </p>
+            {/* Section 3: animated total score */}
             <p className="text-4xl font-black text-gray-900 tabular-nums">
               {animatedScore.toLocaleString()}
-              <span className="text-lg font-semibold text-gray-400">
-                {' '}/ {maxScore.toLocaleString()}
-              </span>
+              <span className="text-base font-semibold text-gray-400"> / {maxScore.toLocaleString()}</span>
+            </p>
+            {/* Section 4: performance summary */}
+            <p className="text-sm font-bold text-gray-500 mt-1">
+              {getPerformanceSummary(totalScore)}
             </p>
             {newBest && (
-              <p className="text-sm font-bold text-amber-500 mt-1">🏆 New Personal Best!</p>
+              <p className="text-xs font-bold text-amber-500 mt-0.5">🏆 New Personal Best!</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
-        {/* Streak card */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 max-w-md mx-auto w-full">
+        {/* Streak */}
         {dayStreak > 0 && (
-          <StreakCard
-            current={dayStreak}
-            longest={longestStreak}
-            onMilestone={() => fireConfetti()}
-          />
+          <StreakCard current={dayStreak} longest={longestStreak} onMilestone={() => fireConfetti()} />
         )}
 
-        {/* Round breakdown */}
+        {/* Round breakdown — Section 4: whole number distances */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="grid grid-cols-4 px-4 py-2 bg-gray-50 border-b border-gray-100">
             <p className="text-xs font-bold text-gray-400 uppercase">#</p>
@@ -163,19 +168,17 @@ export default function FinalScreen({
           </div>
           {results.map((result, i) => {
             const loc = locations.find((l) => l.id === result.locationId)
-            const distStr = formatDistance(result.distanceMiles, result.distanceKm, unitPreference)
+            // Section 4: whole number distance
+            const distStr = formatDistanceWhole(result.distanceMiles, result.distanceKm, unitPreference)
             return (
-              <div
-                key={i}
-                className="grid grid-cols-4 px-4 py-3 border-b border-gray-50 last:border-0"
-              >
+              <div key={i} className="grid grid-cols-4 px-4 py-2.5 border-b border-gray-50 last:border-0">
                 <p className="text-sm font-bold text-gray-400">{i + 1}</p>
                 <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 truncate">{loc?.name}</p>
                   <p className="text-xs text-gray-400">{distStr}</p>
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-bold ${ratingColors[result.rating]}`}>
+                  <p className={`text-sm font-bold ${RATING_COLORS[result.rating]}`}>
                     {result.pointsTotal}
                   </p>
                   <p className="text-xs text-gray-400">{result.rating}</p>
@@ -185,16 +188,18 @@ export default function FinalScreen({
           })}
         </div>
 
-        {/* Share */}
+        {/* Section 2 & 3: Share button with press feedback */}
         <button
           onClick={handleShare}
-          className="w-full py-3.5 rounded-2xl bg-sky-400 text-white font-bold hover:bg-sky-500 transition-colors shadow-md shadow-sky-200"
+          className="w-full py-3.5 min-h-[44px] rounded-2xl bg-sky-400 text-white font-bold
+                     hover:bg-sky-500 active:scale-95 transition-transform duration-100
+                     shadow-md shadow-sky-200"
         >
           Share My Result 📤
         </button>
 
-        {/* Tomorrow countdown */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-5 text-center space-y-1">
+        {/* Countdown */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 text-center space-y-1">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
             Next challenge in
           </p>
@@ -203,13 +208,15 @@ export default function FinalScreen({
 
         <button
           onClick={onHome}
-          className="w-full py-3.5 rounded-2xl bg-white border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+          className="w-full py-3.5 min-h-[44px] rounded-2xl bg-white border border-gray-200
+                     text-gray-600 font-semibold hover:bg-gray-50
+                     active:scale-95 transition-transform duration-100"
         >
           ← Back to Home
         </button>
 
         {/* Legend */}
-        <div className="flex items-center justify-center gap-6 py-2">
+        <div className="flex items-center justify-center gap-6 pb-2">
           <div className="flex items-center gap-1.5">
             <span className="text-amber-400 text-lg">📍</span>
             <span className="text-xs text-gray-500">Your guesses</span>
@@ -224,7 +231,6 @@ export default function FinalScreen({
   )
 }
 
-// Inline countdown (avoids importing CountdownTimer which has its own container styles)
 function CountdownInline() {
   const [ms, setMs] = useState(() => {
     const now = new Date()

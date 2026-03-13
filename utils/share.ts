@@ -2,17 +2,25 @@ import { RoundResult, Location } from '@/types'
 
 function getEmojiRow(pointsBase: number): string {
   if (pointsBase >= 1000) return '🟢🟢🟢🟢🟢'
-  if (pointsBase >= 900) return '🟢🟢🟢🟢⚪'
-  if (pointsBase >= 700) return '🟢🟢🟢⚪⚪'
-  if (pointsBase >= 500) return '🟡🟡🟡⚪⚪'
-  if (pointsBase >= 300) return '🟡🟡⚪⚪⚪'
-  if (pointsBase >= 60) return '🔴⚪⚪⚪⚪'
-  if (pointsBase > 0) return '🔴⚪⚪⚪⚪'
+  if (pointsBase >= 900)  return '🟢🟢🟢🟢⚪'
+  if (pointsBase >= 700)  return '🟢🟢🟢⚪⚪'
+  if (pointsBase >= 500)  return '🟡🟡🟡⚪⚪'
+  if (pointsBase >= 300)  return '🟡🟡⚪⚪⚪'
+  if (pointsBase >= 60)   return '🔴⚪⚪⚪⚪'
+  if (pointsBase > 0)     return '🔴⚪⚪⚪⚪'
   return '⚫⚪⚪⚪⚪'
 }
 
+function getPlayfulOneliner(totalScore: number): string {
+  if (totalScore === 5000) return '"A perfect run. The globe has no secrets from you." 🌐'
+  if (totalScore >= 4000) return '"You could navigate a pirate ship with those instincts." 🏴‍☠️'
+  if (totalScore >= 3000) return '"Not bad for a landlocked guesser." 🌍'
+  if (totalScore >= 2000) return '"The world is big. You found some of it." 🗺️'
+  return '"Geography class would like a word." 📚'
+}
+
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00') // noon avoids TZ rollover
+  const d = new Date(dateStr + 'T12:00:00')
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -21,6 +29,8 @@ function formatDate(dateStr: string): string {
   return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`
 }
 
+export type ShareFormat = 'minimal' | 'standard' | 'playful'
+
 export function buildShareText(
   results: RoundResult[],
   locations: Location[],
@@ -28,47 +38,60 @@ export function buildShareText(
   dateStr: string,
   dayStreak: number,
   unitPreference: 'mi' | 'km' = 'mi',
+  format: ShareFormat = 'standard',
 ): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pinquest.app'
-  const streakLine = dayStreak > 0 ? ` · 🔥 ${dayStreak} day streak` : ''
+  const emojiGrid = results.map((r) => getEmojiRow(r.pointsBase)).join(' ')
+  const streakSuffix = dayStreak > 0 ? ` · 🔥 ${dayStreak}-day streak` : ''
 
-  const lines = results.map((r, i) => {
-    const loc = locations.find((l) => l.id === r.locationId)
-    const name = loc?.name ?? 'Unknown'
-    const dist =
-      unitPreference === 'km'
-        ? `${r.distanceKm.toFixed(1)} km`
-        : `${r.distanceMiles.toFixed(1)} mi`
-    return `${i + 1}. ${getEmojiRow(r.pointsBase)} ${name} · ${dist}`
-  })
+  if (format === 'minimal') {
+    return [
+      `PinQuest 📍`,
+      `${totalScore.toLocaleString()} / 5,000`,
+      '',
+      emojiGrid,
+      '',
+      siteUrl,
+    ].join('\n')
+  }
 
+  if (format === 'playful') {
+    return [
+      `PinQuest 📍 ${formatDate(dateStr)}`,
+      `${totalScore.toLocaleString()} / 5,000${streakSuffix}`,
+      '',
+      emojiGrid,
+      '',
+      getPlayfulOneliner(totalScore),
+      '',
+      `Play today → ${siteUrl}`,
+    ].join('\n')
+  }
+
+  // standard (default)
   return [
     `PinQuest 📍 ${formatDate(dateStr)}`,
-    `${totalScore.toLocaleString()} / 5,000${streakLine}`,
+    `${totalScore.toLocaleString()} / 5,000${streakSuffix}`,
     '',
-    ...lines,
+    emojiGrid,
     '',
-    `Play today's challenge → ${siteUrl}`,
+    `Play today → ${siteUrl}`,
   ].join('\n')
 }
 
 export async function shareResult(text: string): Promise<'native' | 'clipboard' | 'error'> {
-  // Try native share sheet first (mobile browsers)
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
       await navigator.share({ text })
       return 'native'
     } catch {
-      // User cancelled or share failed — fall through to clipboard
+      // cancelled or unsupported — fall through
     }
   }
-
-  // Clipboard fallback
   try {
     await navigator.clipboard.writeText(text)
     return 'clipboard'
   } catch {
-    // execCommand fallback for older browsers
     try {
       const el = document.createElement('textarea')
       el.value = text

@@ -244,7 +244,7 @@ export default function GamePage() {
 
       <div
         className="flex-1 overflow-hidden"
-        style={{ paddingBottom: isReveal ? 420 : 260 }}
+        style={{ paddingBottom: isReveal ? 270 : 235 }}
       >
         <GameMap
           targetLocation={currentLocation}
