@@ -11,6 +11,7 @@ import {
 import { User, Session } from '@supabase/supabase-js'
 import { getSupabaseClient } from './supabase'
 import { Profile, RoundResult } from '@/types'
+import { trackSignupCompleted } from '@/utils/analytics'
 
 interface AuthContextValue {
   user: User | null
@@ -104,11 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ): Promise<{ error: string | null }> => {
       const supabase = getSupabaseClient()
       if (!supabase) return { error: 'Supabase not configured' }
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { username } },
       })
+      if (!error && data.user) {
+        trackSignupCompleted(data.user.id, new Date().toISOString().split('T')[0])
+      }
       return { error: error?.message ?? null }
     },
     [],

@@ -8,6 +8,8 @@ import { isNewPersonalBest, setPersonalBest } from '@/utils/storage'
 import { buildShareText, shareResult } from '@/utils/share'
 import StreakCard from './StreakCard'
 import Toast from './Toast'
+import { useAuth } from '@/lib/AuthContext'
+import { trackShareClicked } from '@/utils/analytics'
 
 const GameMap = dynamic(() => import('./Map'), { ssr: false })
 
@@ -67,6 +69,7 @@ export default function FinalScreen({
   onHome,
   onAuthPrompt,
 }: FinalScreenProps) {
+  const { user } = useAuth()
   const [newBest, setNewBest] = useState(false)
   const [animatedScore, setAnimatedScore] = useState(0)
   const [toastVisible, setToastVisible] = useState(false)
@@ -99,6 +102,7 @@ export default function FinalScreen({
   }, [newBest, onAuthPrompt])
 
   const handleShare = useCallback(async () => {
+    trackShareClicked(user?.id ?? null, totalScore, dateStr)
     const text = buildShareText(results, locations, totalScore, dateStr, dayStreak, unitPreference, 'standard')
     const outcome = await shareResult(text)
     if (outcome === 'clipboard') {

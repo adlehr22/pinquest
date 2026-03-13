@@ -10,6 +10,7 @@ import { calculateStreak } from '@/utils/scoring'
 import { playPinDrop, playWhoosh, playChime } from '@/utils/sound'
 import { getDailyLocations, getTodayDateString } from '@/utils/daily'
 import { recordGamePlayed, getStreakData } from '@/utils/streak'
+import { trackGameStarted, trackRoundCompleted, trackGameCompleted } from '@/utils/analytics'
 import { useAuth } from '@/lib/AuthContext'
 import GameHeader from '@/components/GameHeader'
 import PromptCard from '@/components/PromptCard'
@@ -83,6 +84,7 @@ export default function GamePage() {
     const sd = getStreakData()
     setDayStreak(sd.current)
     setLongestStreak(sd.longest)
+    trackGameStarted(user?.id ?? null, todayStr)
     const t = setTimeout(() => setCardVisible(true), 200)
     return () => clearTimeout(t)
   }, [todayStr])
@@ -128,6 +130,15 @@ export default function GamePage() {
       streakCount: streak,
     }))
 
+    trackRoundCompleted(
+      user?.id ?? null,
+      gameState.currentRound + 1,
+      currentLocation.id,
+      finalResult.distanceMiles,
+      finalResult.pointsTotal,
+      todayStr,
+    )
+
     playWhoosh(muted)
     if (finalResult.rating === 'PERFECT' || finalResult.rating === 'GREAT') {
       setTimeout(() => playChime(muted), 400)
@@ -166,6 +177,8 @@ export default function GamePage() {
     if (milestones.includes(updatedStreak.current)) {
       setTimeout(() => fireConfetti(), 1000)
     }
+
+    trackGameCompleted(user?.id ?? null, totalScore, todayStr)
 
     // Save to DB if logged in
     if (user) {
