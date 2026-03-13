@@ -19,14 +19,15 @@ function getPlayfulOneliner(totalScore: number): string {
   return '"Geography class would like a word." 📚'
 }
 
+const ROUND_LABELS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣']
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00')
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ]
-  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
 export type ShareFormat = 'minimal' | 'standard' | 'playful'
@@ -41,7 +42,9 @@ export function buildShareText(
   format: ShareFormat = 'standard',
 ): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pinquest.app'
-  const emojiGrid = results.map((r) => getEmojiRow(r.pointsBase)).join(' ')
+  const emojiGrid = results
+    .map((r, i) => `${ROUND_LABELS[i] ?? `${i + 1}.`} ${getEmojiRow(r.pointsBase)}`)
+    .join('\n')
   const streakSuffix = dayStreak > 0 ? ` · 🔥 ${dayStreak}-day streak` : ''
 
   if (format === 'minimal') {
