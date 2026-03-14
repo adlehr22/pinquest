@@ -51,7 +51,7 @@ export default function PromptCard({
             <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-0.5">
               Find this location
             </p>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 leading-snug truncate">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 leading-snug line-clamp-2">
               {location.prompt.replace('Find ', '').replace('Find the ', '')}
             </h2>
           </div>
