@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/AuthContext'
 import { getPersonalBest } from '@/utils/storage'
 import { getStreakData, isStreakAtRisk } from '@/utils/streak'
-import { getTodayDateString } from '@/utils/daily'
+import { getTodayDateString, getDailyLocations } from '@/utils/daily'
 import { hasPlayedToday, getTodayResult } from '@/utils/storage'
+import { getSupabaseClient } from '@/lib/supabase'
 import AuthModal from '@/components/AuthModal'
 import ThemeToggle from '@/components/ThemeToggle'
+import WorldMapBg from '@/components/WorldMapBg'
 
 function HowToPlayModal({ onClose }: { onClose: () => void }) {
   return (
@@ -45,6 +47,29 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function DifficultyPills({ easy, medium, hard }: { easy: number; medium: number; hard: number }) {
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <span className="text-xs text-gray-400 dark:text-slate-500 font-medium">Today:</span>
+      {easy > 0 && (
+        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+          {easy} Easy
+        </span>
+      )}
+      {medium > 0 && (
+        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+          {medium} Medium
+        </span>
+      )}
+      {hard > 0 && (
+        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+          {hard} Hard
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function HomePage() {
   const router = useRouter()
   const { user, profile } = useAuth()
@@ -57,6 +82,9 @@ export default function HomePage() {
   const [streakData, setStreakData] = useState({ current: 0, longest: 0, lastPlayedDate: null as string | null })
   const [atRisk, setAtRisk] = useState(false)
   const [todayScore, setTodayScore] = useState<number | null>(null)
+  const [playerCount, setPlayerCount] = useState<number | null>(null)
+  const [difficultyCount, setDifficultyCount] = useState({ easy: 0, medium: 0, hard: 0 })
+  const [afterSixPm, setAfterSixPm] = useState(false)
 
   useEffect(() => {
     const ts = getTodayDateString()
@@ -71,21 +99,48 @@ export default function HomePage() {
     if (result?.dateStr === ts) setTodayScore(result.totalScore)
 
     const now = new Date()
+    setAfterSixPm(now.getHours() >= 18)
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
     setToday(`${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`)
+
+    // Count today's difficulty mix
+    const locs = getDailyLocations(ts)
+    setDifficultyCount({
+      easy:   locs.filter((l) => l.difficulty === 'easy').length,
+      medium: locs.filter((l) => l.difficulty === 'medium').length,
+      hard:   locs.filter((l) => l.difficulty === 'hard').length,
+    })
+
+    // Fetch player count from leaderboard_today (public read)
+    const supabase = getSupabaseClient()
+    if (supabase) {
+      supabase
+        .from('leaderboard_today')
+        .select('rank', { count: 'exact', head: true })
+        .then(({ count }) => {
+          if (count && count > 0) setPlayerCount(count)
+        }, () => {})
+    }
   }, [])
 
   const handlePlay = () => router.push('/game')
   const handleViewResults = () => router.push('/game')
 
+  // Streak urgency: amber after 6pm if streak is at risk, blue before
+  const urgencyStyle = afterSixPm
+    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-600 dark:text-amber-400'
+    : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400'
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-[#0f1923] dark:to-[#0f1923] flex flex-col items-center justify-center px-6 py-8 transition-colors duration-200">
+    <div className="relative min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-[#0f1923] dark:to-[#0f1923] flex flex-col items-center justify-center px-6 py-8 transition-colors duration-200 overflow-hidden">
+      <WorldMapBg />
+
       {showHowTo && <HowToPlayModal onClose={() => setShowHowTo(false)} />}
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
-      <div className="w-full max-w-sm space-y-6 text-center">
-        {/* Top bar: leaderboard + profile + theme toggle */}
+      <div className="relative w-full max-w-sm space-y-6 text-center">
+        {/* Top bar */}
         <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/leaderboard')}
@@ -117,12 +172,22 @@ export default function HomePage() {
           <h1 className="text-5xl font-black text-gray-900 dark:text-slate-100 tracking-tight">PinQuest</h1>
           <p className="text-gray-500 dark:text-slate-400 font-medium">Daily Geography Challenge</p>
           <p className="text-gray-400 dark:text-slate-500 text-sm">{today}</p>
+          {/* Difficulty preview */}
+          {(difficultyCount.easy + difficultyCount.medium + difficultyCount.hard) > 0 && (
+            <DifficultyPills easy={difficultyCount.easy} medium={difficultyCount.medium} hard={difficultyCount.hard} />
+          )}
+          {/* Player count */}
+          {playerCount !== null && playerCount > 0 && (
+            <p className="text-xs text-gray-400 dark:text-slate-500">
+              🌍 {playerCount} {playerCount === 1 ? 'player has' : 'players have'} played today
+            </p>
+          )}
         </div>
 
-        {/* Streak at risk warning */}
+        {/* Streak urgency banner (not played, streak > 0, at risk) */}
         {atRisk && streakData.current > 0 && !playedToday && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-2xl px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400">
-            ⚠️ Streak at risk! Play before midnight to keep your 🔥 {streakData.current} day streak.
+          <div className={`border rounded-2xl px-4 py-3 text-sm font-semibold ${urgencyStyle}`}>
+            {afterSixPm ? '⚠️' : '⏰'} {afterSixPm ? 'Almost midnight!' : 'Streak at risk!'} Play to keep your 🔥 {streakData.current} day streak.
           </div>
         )}
 
@@ -140,7 +205,7 @@ export default function HomePage() {
           </div>
         ) : (
           <>
-            {user && streakData.current > 0 && (
+            {user && streakData.current > 0 && !atRisk && (
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl px-4 py-3">
                 <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
                   🔥 {streakData.current} day streak — keep it going!
@@ -197,12 +262,20 @@ export default function HomePage() {
               Drop Today&apos;s Pins →
             </button>
           )}
-          <button
-            onClick={() => setShowHowTo(true)}
-            className="w-full py-3.5 bg-white dark:bg-[#162130] border-2 border-gray-200 dark:border-[#1e3a4a] text-gray-600 dark:text-slate-300 text-sm font-bold rounded-full hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            How to Play
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowHowTo(true)}
+              className="flex-1 py-3.5 bg-white dark:bg-[#162130] border-2 border-gray-200 dark:border-[#1e3a4a] text-gray-600 dark:text-slate-300 text-sm font-bold rounded-full hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              How to Play
+            </button>
+            <button
+              onClick={() => router.push('/practice')}
+              className="flex-1 py-3.5 bg-white dark:bg-[#162130] border-2 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-300 text-sm font-bold rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+            >
+              🎯 Practice
+            </button>
+          </div>
         </div>
 
         {/* Guest nudge */}

@@ -113,3 +113,41 @@ export function markAuthPrompted(): void {
     sessionStorage.setItem('pinquest_auth_prompted', 'true')
   } catch {}
 }
+
+// ── Practice best ────────────────────────────────────────
+
+export function getPracticeBest(): number | null {
+  try {
+    const val = localStorage.getItem('pinquest_practice_best')
+    if (val === null) return null
+    const parsed = parseInt(val, 10)
+    return isNaN(parsed) ? null : parsed
+  } catch {
+    return null
+  }
+}
+
+export function setPracticeBest(score: number): void {
+  try {
+    const current = getPracticeBest()
+    if (current === null || score > current) {
+      localStorage.setItem('pinquest_practice_best', score.toString())
+    }
+  } catch {}
+}
+
+// ── PWA nudge ────────────────────────────────────────────
+
+export function isPwaPromptDismissed(): boolean {
+  try {
+    return localStorage.getItem('pinquest_pwa_dismissed') === 'true'
+  } catch {
+    return false
+  }
+}
+
+export function dismissPwaPrompt(): void {
+  try {
+    localStorage.setItem('pinquest_pwa_dismissed', 'true')
+  } catch {}
+}

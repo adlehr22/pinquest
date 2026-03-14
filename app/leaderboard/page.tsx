@@ -6,6 +6,8 @@ import { getSupabaseClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/AuthContext'
 import { LeaderboardEntry } from '@/types'
 import ThemeToggle from '@/components/ThemeToggle'
+import { getTodayDateString } from '@/utils/daily'
+import { hasPlayedToday } from '@/utils/storage'
 
 type Tab = 'today' | 'alltime' | 'friends'
 
@@ -18,11 +20,48 @@ interface AlltimeEntry {
   rank: number
 }
 
+const SCORE_BANDS = [
+  { label: '4,001–5,000', min: 4001, max: 5000, color: 'bg-emerald-400 dark:bg-emerald-500' },
+  { label: '3,001–4,000', min: 3001, max: 4000, color: 'bg-sky-400 dark:bg-sky-500' },
+  { label: '2,001–3,000', min: 2001, max: 3000, color: 'bg-amber-400 dark:bg-amber-500' },
+  { label: '1,001–2,000', min: 1001, max: 2000, color: 'bg-orange-400 dark:bg-orange-500' },
+  { label: '0–1,000',     min: 0,    max: 1000,  color: 'bg-red-400 dark:bg-red-500' },
+]
+
 function MedalOrRank({ rank }: { rank: number }) {
   if (rank === 1) return <span className="text-lg">🥇</span>
   if (rank === 2) return <span className="text-lg">🥈</span>
   if (rank === 3) return <span className="text-lg">🥉</span>
   return <span className="text-sm font-bold text-gray-400 dark:text-slate-500">#{rank}</span>
+}
+
+function ScoreDistribution({ rows }: { rows: LeaderboardEntry[] }) {
+  if (rows.length === 0) return null
+  const counts = SCORE_BANDS.map((b) => ({
+    ...b,
+    count: rows.filter((r) => r.total_score >= b.min && r.total_score <= b.max).length,
+  }))
+  const max = Math.max(...counts.map((c) => c.count), 1)
+
+  return (
+    <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] px-4 py-4 mb-3">
+      <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">Score Distribution</p>
+      <div className="space-y-2">
+        {counts.map((b) => (
+          <div key={b.label} className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 dark:text-slate-500 w-24 flex-shrink-0">{b.label}</span>
+            <div className="flex-1 bg-gray-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${b.color}`}
+                style={{ width: `${(b.count / max) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs font-bold text-gray-500 dark:text-slate-400 w-5 text-right">{b.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function LeaderboardPage() {
@@ -32,23 +71,32 @@ export default function LeaderboardPage() {
   const [todayRows, setTodayRows] = useState<LeaderboardEntry[]>([])
   const [alltimeRows, setAlltimeRows] = useState<AlltimeEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [myRank, setMyRank] = useState<number | null>(null)
+  const [playedToday, setPlayedToday] = useState(false)
 
   useEffect(() => {
+    const ts = getTodayDateString()
+    setPlayedToday(hasPlayedToday(ts))
+
     async function fetchToday() {
       const supabase = getSupabaseClient()
-      if (!supabase) {
-        setLoading(false)
-        return
-      }
+      if (!supabase) { setLoading(false); return }
       const { data } = await supabase
         .from('leaderboard_today')
         .select('*')
         .order('rank', { ascending: true })
-      setTodayRows((data as LeaderboardEntry[]) ?? [])
+      const rows = (data as LeaderboardEntry[]) ?? []
+      setTodayRows(rows)
+
+      const myUsername = profile?.username ?? ''
+      if (myUsername) {
+        const mine = rows.find((r) => r.username === myUsername)
+        if (mine) setMyRank(mine.rank)
+      }
       setLoading(false)
     }
     fetchToday()
-  }, [])
+  }, [profile])
 
   useEffect(() => {
     if (tab !== 'alltime') return
@@ -103,26 +151,25 @@ export default function LeaderboardPage() {
       </div>
 
       <div className="px-4 pb-10">
-        {/* Friends tab — placeholder */}
-        {tab === 'friends' && (
-          <div className="bg-white dark:bg-[#162130] rounded-2xl p-8 text-center space-y-3 border border-gray-100 dark:border-[#1e3a4a]">
-            <p className="text-4xl">👥</p>
-            <p className="font-bold text-gray-700 dark:text-slate-200">Friends coming soon</p>
-            <p className="text-sm text-gray-400 dark:text-slate-500">
-              Invite friends and compete head-to-head on daily challenges.
-            </p>
-          </div>
-        )}
-
         {tab === 'today' && (
-          <LeaderboardTable
-            loading={loading}
-            rows={todayRows}
-            myUsername={myUsername}
-            isLoggedIn={isLoggedIn}
-            renderScore={(r) => r.total_score.toLocaleString()}
-            renderSub={(r) => `🔥 ${r.current_streak}`}
-          />
+          <>
+            <ScoreDistribution rows={todayRows} />
+            <LeaderboardTable
+              loading={loading}
+              rows={todayRows}
+              myUsername={myUsername}
+              isLoggedIn={isLoggedIn}
+              renderScore={(r) => r.total_score.toLocaleString()}
+              renderSub={(r) => `🔥 ${r.current_streak}`}
+            />
+            {myRank !== null && myRank > 10 && playedToday && (
+              <div className="mt-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/40 rounded-2xl px-4 py-3 text-center">
+                <p className="text-sm font-bold text-sky-600 dark:text-sky-400">
+                  Your rank today: #{myRank} of {todayRows.length}
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {tab === 'alltime' && (
@@ -134,6 +181,60 @@ export default function LeaderboardPage() {
             renderScore={(r) => Math.round((r as AlltimeEntry).average_score).toLocaleString()}
             renderSub={(r) => `${(r as AlltimeEntry).total_games} games`}
           />
+        )}
+
+        {tab === 'friends' && (
+          <div className="space-y-3">
+            <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] px-4 py-4">
+              <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">
+                Today&apos;s Players
+              </p>
+              {todayRows.length === 0 ? (
+                <p className="text-gray-400 dark:text-slate-500 text-sm text-center py-4">
+                  No players yet today — be the first!
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {todayRows.slice(0, 10).map((row) => (
+                    <div key={row.rank} className="flex items-center gap-2">
+                      <div className="w-8 flex items-center justify-center flex-shrink-0">
+                        <MedalOrRank rank={row.rank} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-slate-200 truncate">
+                          {row.username}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-slate-500">
+                          {row.total_score.toLocaleString()} pts
+                        </p>
+                      </div>
+                      {playedToday && (
+                        <button
+                          onClick={() => router.push('/game')}
+                          className="text-xs font-bold text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 flex-shrink-0 bg-sky-50 dark:bg-sky-900/20 px-2.5 py-1.5 rounded-lg"
+                        >
+                          Challenge
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {!playedToday && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl px-4 py-3 text-center">
+                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                  Play today&apos;s challenge to challenge others!
+                </p>
+                <button
+                  onClick={() => router.push('/game')}
+                  className="mt-1.5 text-xs font-bold text-sky-500 hover:text-sky-600"
+                >
+                  Play Now →
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -184,9 +285,10 @@ function LeaderboardTable<T extends { rank: number; username: string; current_st
           return (
             <div
               key={row.rank}
-              className={`flex items-center px-4 py-3.5 border-b border-gray-50 dark:border-[#1e3a4a] last:border-0 transition-colors ${
+              className={`flex items-center px-4 py-3.5 border-b border-gray-50 dark:border-[#1e3a4a] last:border-0 animate-row-in transition-colors ${
                 isMe ? 'bg-sky-50 dark:bg-sky-900/20' : ''
               } ${isBlurred ? 'blur-[3px] select-none pointer-events-none' : ''}`}
+              style={{ animationDelay: `${i * 40}ms` }}
             >
               <div className="w-10 flex items-center justify-center">
                 <MedalOrRank rank={row.rank} />

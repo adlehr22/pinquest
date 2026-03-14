@@ -76,3 +76,20 @@ body {
 .dark .leaflet-control-attribution a {
   color: #38BDF8 !important;
 }
+
+/* ── World map pan animation (Home screen background) ─── */
+@keyframes worldPan {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ── Leaderboard row entrance animation ──────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-row-in {
+  animation: fadeInUp 0.25s ease forwards;
+  opacity: 0;
+}

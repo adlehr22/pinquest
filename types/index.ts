@@ -74,3 +74,15 @@ export interface TodayResult {
   totalScore: number
   results: RoundResult[]
 }
+
+// ── Friend challenges ─────────────────────────────────────
+export interface ChallengeRun {
+  id: string
+  challenge_code: string
+  location_ids: number[]
+  original_score: number
+  original_username: string | null
+  original_user_id: string | null
+  times_played: number
+  created_at: string
+}

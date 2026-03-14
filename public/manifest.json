@@ -1,0 +1,24 @@
+{
+  "name": "PinQuest",
+  "short_name": "PinQuest",
+  "description": "Daily Geography Challenge — drop pins on a world map to find famous places.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#38BDF8",
+  "theme_color": "#38BDF8",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/api/icon/192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/api/icon/512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

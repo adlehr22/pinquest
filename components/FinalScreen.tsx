@@ -5,11 +5,13 @@ import dynamic from 'next/dynamic'
 import { useTheme } from 'next-themes'
 import { RoundResult, Location } from '@/types'
 import { formatDistanceWhole } from '@/utils/distance'
-import { isNewPersonalBest, setPersonalBest } from '@/utils/storage'
+import { getPersonalBest, isNewPersonalBest, setPersonalBest } from '@/utils/storage'
 import { buildShareText, shareResult } from '@/utils/share'
 import { generateShareImage, shareOrDownloadImage } from '@/utils/shareImage'
+import { createChallenge } from '@/utils/challenges'
 import StreakCard from './StreakCard'
 import Toast from './Toast'
+import PWANudge from './PWANudge'
 import { useAuth } from '@/lib/AuthContext'
 import { trackShareClicked } from '@/utils/analytics'
 
@@ -37,6 +39,22 @@ function getPerformanceSummary(score: number): string {
   if (score >= 3000) return 'Great job! 🎯'
   if (score >= 2000) return 'Not bad! 🗺️'
   return 'Keep practicing! 💪'
+}
+
+function getFlexLine(totalScore: number, prevBest: number | null): string {
+  if (totalScore === 5000) return 'Absolutely perfect — flawless game! 🏆'
+  if (prevBest === null) return 'First game! Set the bar. 🎯'
+  if (totalScore > prevBest) {
+    const diff = totalScore - prevBest
+    return `New personal best — up ${diff.toLocaleString()} pts! 🔥`
+  }
+  if (totalScore === prevBest) return 'Matched your personal best! One more push! 💪'
+  const gap = prevBest - totalScore
+  if (gap < 200) return `Just ${gap} pts shy of your best — so close! 😤`
+  if (totalScore >= 4000) return 'Elite geographer! Top tier performance. 🌍'
+  if (totalScore >= 3000) return 'Solid round! Your geography skills are sharp. 🗺️'
+  if (totalScore >= 2000) return 'Not bad — keep exploring! 🧭'
+  return 'Every game makes you better. Keep going! 💪'
 }
 
 interface FinalScreenProps {
@@ -70,9 +88,12 @@ export default function FinalScreen({
   onHome,
   onAuthPrompt,
 }: FinalScreenProps) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
+
+  // Capture personal best BEFORE the effect updates it
+  const prevBestRef = useRef(getPersonalBest())
 
   const [newBest, setNewBest] = useState(false)
   const [animatedScore, setAnimatedScore] = useState(0)
@@ -81,6 +102,7 @@ export default function FinalScreen({
   const [shareModal, setShareModal] = useState(false)
   const [shareImageUrl, setShareImageUrl] = useState<string | null>(null)
   const [shareGenerating, setShareGenerating] = useState(false)
+  const [challengeLoading, setChallengeLoading] = useState(false)
   const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -138,7 +160,6 @@ export default function FinalScreen({
         setToastVisible(true)
       }
     } catch {
-      // Fall back to plain text
       const outcome = await shareResult(plainText)
       if (outcome === 'clipboard') {
         setToastMsg('✓ Copied to clipboard!')
@@ -161,11 +182,39 @@ export default function FinalScreen({
     }
   }, [results, locations, totalScore, dateStr, dayStreak, unitPreference])
 
+  // Create a friend challenge
+  const handleChallenge = useCallback(async () => {
+    setChallengeLoading(true)
+    try {
+      const code = await createChallenge(
+        results.map((r) => r.locationId),
+        totalScore,
+        profile?.username ?? null,
+        user?.id ?? null,
+      )
+      if (code) {
+        const url = `${window.location.origin}/challenge/${code}`
+        await navigator.clipboard?.writeText(url).catch(() => {})
+        setToastMsg('Challenge link copied! Send it to a friend. 🔗')
+        setToastVisible(true)
+      } else {
+        setToastMsg('Could not create challenge — try again.')
+        setToastVisible(true)
+      }
+    } catch {
+      setToastMsg('Could not create challenge — try again.')
+      setToastVisible(true)
+    }
+    setChallengeLoading(false)
+  }, [results, totalScore, profile, user])
+
   const maxScore = results.length * 1000
+  const flexLine = getFlexLine(totalScore, prevBestRef.current)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f1923] flex flex-col transition-colors duration-200">
       <Toast message={toastMsg} visible={toastVisible} onHide={() => setToastVisible(false)} />
+      <PWANudge />
 
       {/* Share Image Modal */}
       {shareModal && (
@@ -291,6 +340,11 @@ export default function FinalScreen({
           })}
         </div>
 
+        {/* Flex line */}
+        <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/40 rounded-2xl px-5 py-3 text-center">
+          <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">{flexLine}</p>
+        </div>
+
         {/* Share button */}
         <button
           onClick={handleShare}
@@ -299,6 +353,19 @@ export default function FinalScreen({
                      shadow-md shadow-sky-200 dark:shadow-sky-900/50"
         >
           Share My Result 📤
+        </button>
+
+        {/* Challenge a friend */}
+        <button
+          onClick={handleChallenge}
+          disabled={challengeLoading}
+          className="w-full py-3.5 min-h-[44px] rounded-2xl border-2 border-sky-300 dark:border-sky-700
+                     text-sky-600 dark:text-sky-300 font-bold
+                     hover:bg-sky-50 dark:hover:bg-sky-900/20
+                     active:scale-95 transition-transform duration-100
+                     disabled:opacity-60"
+        >
+          {challengeLoading ? 'Creating challenge…' : '⚔️ Challenge a Friend'}
         </button>
 
         {/* Countdown */}
