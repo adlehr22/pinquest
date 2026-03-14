@@ -30,10 +30,10 @@ export default function CountdownTimer() {
 
   return (
     <div className="text-center">
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">
+      <p className="text-xs text-gray-400 dark:text-slate-500 font-medium uppercase tracking-widest mb-1">
         Next challenge in
       </p>
-      <p className="text-3xl font-black text-gray-800 tabular-nums tracking-tight">
+      <p className="text-3xl font-black text-gray-800 dark:text-slate-100 tabular-nums tracking-tight">
         {formatMs(remaining)}
       </p>
     </div>

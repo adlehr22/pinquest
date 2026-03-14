@@ -52,7 +52,7 @@ export default function AlreadyPlayedScreen({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white flex flex-col items-center justify-center px-6 py-10">
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-[#0f1923] dark:to-[#0f1923] flex flex-col items-center justify-center px-6 py-10 transition-colors duration-200">
       <Toast
         message={toastMsg}
         visible={toastVisible}
@@ -63,19 +63,19 @@ export default function AlreadyPlayedScreen({
         {/* Header */}
         <div className="text-center space-y-2">
           <p className="text-5xl">✅</p>
-          <h1 className="text-2xl font-black text-gray-900">Already played today!</h1>
-          <p className="text-gray-400 text-sm">Come back tomorrow for a new challenge.</p>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-slate-100">Already played today!</h1>
+          <p className="text-gray-400 dark:text-slate-400 text-sm">Come back tomorrow for a new challenge.</p>
         </div>
 
         {/* Score recap */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-50">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+        <div className="bg-white dark:bg-[#162130] rounded-2xl shadow-sm border border-gray-100 dark:border-[#1e3a4a] overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-50 dark:border-[#1e3a4a]">
+            <p className="text-xs font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-1">
               Your score today
             </p>
-            <p className="text-4xl font-black text-gray-900 tabular-nums">
+            <p className="text-4xl font-black text-gray-900 dark:text-slate-100 tabular-nums">
               {todayResult.totalScore.toLocaleString()}
-              <span className="text-lg font-semibold text-gray-400"> / 5,000</span>
+              <span className="text-lg font-semibold text-gray-400 dark:text-slate-500"> / 5,000</span>
             </p>
             {streak.current > 0 && (
               <p className="text-sm font-bold text-amber-500 mt-1">🔥 {streak.current} day streak</p>
@@ -87,15 +87,15 @@ export default function AlreadyPlayedScreen({
             const loc = locations.find((l) => l.id === r.locationId)
             const dist = formatDistance(r.distanceMiles, r.distanceKm, unitPreference)
             return (
-              <div key={i} className="flex items-center justify-between px-5 py-2.5 border-b border-gray-50 last:border-0">
+              <div key={i} className="flex items-center justify-between px-5 py-2.5 border-b border-gray-50 dark:border-[#1e3a4a] last:border-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-300 w-4">{i + 1}</span>
-                  <span className="text-sm font-semibold text-gray-700 truncate max-w-[140px]">
+                  <span className="text-xs font-bold text-gray-300 dark:text-slate-600 w-4">{i + 1}</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-slate-200 truncate max-w-[140px]">
                     {loc?.name}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400">{dist}</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-400">{dist}</span>
                   <span className={`text-xs font-bold ${RATING_COLORS[r.rating]}`}>
                     {r.pointsTotal}
                   </span>
@@ -106,21 +106,21 @@ export default function AlreadyPlayedScreen({
         </div>
 
         {/* Countdown */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-5">
+        <div className="bg-white dark:bg-[#162130] rounded-2xl shadow-sm border border-gray-100 dark:border-[#1e3a4a] px-5 py-5">
           <CountdownTimer />
         </div>
 
         {/* Actions */}
         <button
           onClick={handleShare}
-          className="w-full py-3.5 bg-sky-400 text-white font-bold rounded-2xl hover:bg-sky-500 transition-colors shadow-md shadow-sky-200"
+          className="w-full py-3.5 bg-sky-400 text-white font-bold rounded-2xl hover:bg-sky-500 transition-colors shadow-md shadow-sky-200 dark:shadow-sky-900/50"
         >
           Share My Result
         </button>
 
         <button
           onClick={onHome}
-          className="w-full py-3 text-sm font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+          className="w-full py-3 text-sm font-semibold text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
         >
           ← Back to Home
         </button>
