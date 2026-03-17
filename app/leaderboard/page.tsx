@@ -105,15 +105,23 @@ export default function LeaderboardPage() {
       type RawRow = {
         total_score: number
         played_date: string
-        profiles: { username: string; current_streak: number } | null
+        profiles: { username: string; current_streak: number }
+          | { username: string; current_streak: number }[]
+          | null
       }
-      const rows: LeaderboardEntry[] = ((data as RawRow[]) ?? []).map((row, i) => ({
-        username: row.profiles?.username ?? 'Guest',
-        total_score: row.total_score,
-        played_date: row.played_date,
-        current_streak: row.profiles?.current_streak ?? 0,
-        rank: i + 1,
-      }))
+      const rows: LeaderboardEntry[] = ((data as unknown as RawRow[]) ?? []).map((row, i) => {
+        // profiles can be array or object depending on join type
+        const profile = Array.isArray(row.profiles)
+          ? row.profiles[0]
+          : row.profiles
+        return {
+          username: profile?.username ?? 'Anonymous',
+          total_score: row.total_score,
+          played_date: row.played_date,
+          current_streak: profile?.current_streak ?? 0,
+          rank: i + 1,
+        }
+      })
 
       setTodayRows(rows)
 
