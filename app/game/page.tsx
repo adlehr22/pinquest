@@ -46,7 +46,7 @@ async function fireConfetti() {
 
 export default function GamePage() {
   const router = useRouter()
-  const { user, saveGameToDb } = useAuth()
+  const { user, saveGameToDb, saveGuestGame } = useAuth()
 
   // Derive today's date & locations once
   const todayStr = getTodayDateString()
@@ -180,11 +180,13 @@ export default function GamePage() {
 
     trackGameCompleted(user?.id ?? null, totalScore, todayStr)
 
-    // Save to DB if logged in
+    // Save to DB — logged-in users save with profile, guests save anonymously
     if (user) {
       saveGameToDb(todayStr, totalScore, results, updatedStreak.current, updatedStreak.longest)
+    } else {
+      saveGuestGame(todayStr, totalScore, results)
     }
-  }, [todayStr, user, saveGameToDb])
+  }, [todayStr, user, saveGameToDb, saveGuestGame])
 
   const handleAuthPrompt = useCallback(() => {
     if (user) return // already logged in

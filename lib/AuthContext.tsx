@@ -33,6 +33,11 @@ interface AuthContextValue {
     streak: number,
     longestStreak: number,
   ) => Promise<void>
+  saveGuestGame: (
+    dateStr: string,
+    totalScore: number,
+    results: RoundResult[],
+  ) => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
@@ -164,6 +169,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, fetchProfile],
   )
 
+  const saveGuestGame = useCallback(
+    async (dateStr: string, totalScore: number, results: RoundResult[]) => {
+      const supabase = getSupabaseClient()
+      if (!supabase) return
+      try {
+        await supabase.from('games').insert({
+          user_id: null,
+          played_date: dateStr,
+          total_score: totalScore,
+          round_results: results,
+        })
+      } catch {
+        // Degrade gracefully
+      }
+    },
+    [],
+  )
+
   const refreshProfile = useCallback(async () => {
     if (user) await fetchProfile(user.id)
   }, [user, fetchProfile])
@@ -180,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resendConfirmation,
         signOut,
         saveGameToDb,
+        saveGuestGame,
         refreshProfile,
       }}
     >

@@ -46,7 +46,7 @@ export interface Profile {
 
 export interface GameRecord {
   id: string
-  user_id: string
+  user_id: string | null
   played_date: string
   total_score: number
   round_results: RoundResult[]

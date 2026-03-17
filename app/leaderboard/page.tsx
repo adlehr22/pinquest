@@ -81,11 +81,40 @@ export default function LeaderboardPage() {
     async function fetchToday() {
       const supabase = getSupabaseClient()
       if (!supabase) { setLoading(false); return }
-      const { data } = await supabase
-        .from('leaderboard_today')
-        .select('*')
-        .order('rank', { ascending: true })
-      const rows = (data as LeaderboardEntry[]) ?? []
+
+      const today = new Date().toISOString().split('T')[0]
+      console.log('Today date:', today)
+
+      const { data, error } = await supabase
+        .from('games')
+        .select(`
+          total_score,
+          played_date,
+          profiles (
+            username,
+            current_streak
+          )
+        `)
+        .eq('played_date', today)
+        .order('total_score', { ascending: false })
+        .limit(100)
+
+      console.log('Leaderboard data:', data)
+      console.log('Leaderboard error:', error)
+
+      type RawRow = {
+        total_score: number
+        played_date: string
+        profiles: { username: string; current_streak: number } | null
+      }
+      const rows: LeaderboardEntry[] = ((data as RawRow[]) ?? []).map((row, i) => ({
+        username: row.profiles?.username ?? 'Guest',
+        total_score: row.total_score,
+        played_date: row.played_date,
+        current_streak: row.profiles?.current_streak ?? 0,
+        rank: i + 1,
+      }))
+
       setTodayRows(rows)
 
       const myUsername = profile?.username ?? ''
@@ -271,7 +300,7 @@ function LeaderboardTable<T extends { rank: number; username: string; current_st
   if (rows.length === 0) {
     return (
       <div className="bg-white dark:bg-[#162130] rounded-2xl p-8 text-center border border-gray-100 dark:border-[#1e3a4a]">
-        <p className="text-gray-400 dark:text-slate-500 text-sm">No scores yet — be the first to play!</p>
+        <p className="text-gray-400 dark:text-slate-500 text-sm">No scores yet today — be the first to play!</p>
       </div>
     )
   }
