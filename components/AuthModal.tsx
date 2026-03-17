@@ -12,7 +12,7 @@ interface AuthModalProps {
 type AuthMode = 'signin' | 'signup'
 
 export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, resendConfirmation } = useAuth()
   const [mode, setMode] = useState<AuthMode>('signup')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,6 +20,9 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendSent, setResendSent] = useState(false)
 
   if (!isSupabaseConfigured()) {
     return (
@@ -59,7 +62,11 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setLoading(false)
 
     if (error) {
-      setError(error)
+      if (error.toLowerCase().includes('email not confirmed')) {
+        setEmailNotConfirmed(true)
+      } else {
+        setError(error)
+      }
     } else {
       setSuccess(true)
       setTimeout(() => {
@@ -136,6 +143,32 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                 <p className="text-xs text-red-500 font-medium px-1">{error}</p>
               )}
 
+              {emailNotConfirmed && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
+                  <p className="text-xs text-amber-800 font-medium">
+                    Please check your email for a confirmation link, or contact support to confirm your account.
+                  </p>
+                  {resendSent ? (
+                    <p className="text-xs text-green-700 font-medium">Confirmation email sent!</p>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={resendLoading}
+                      onClick={async () => {
+                        setResendLoading(true)
+                        const { error } = await resendConfirmation(email)
+                        setResendLoading(false)
+                        if (!error) setResendSent(true)
+                        else setError(error)
+                      }}
+                      className="text-xs text-amber-700 font-bold underline disabled:opacity-60"
+                    >
+                      {resendLoading ? 'Sending…' : 'Resend confirmation email'}
+                    </button>
+                  )}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -154,6 +187,8 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
               onClick={() => {
                 setMode(mode === 'signin' ? 'signup' : 'signin')
                 setError(null)
+                setEmailNotConfirmed(false)
+                setResendSent(false)
               }}
               className="w-full mt-3 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
             >

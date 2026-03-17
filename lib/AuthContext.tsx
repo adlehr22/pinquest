@@ -24,6 +24,7 @@ interface AuthContextValue {
     password: string,
     username: string,
   ) => Promise<{ error: string | null }>
+  resendConfirmation: (email: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   saveGameToDb: (
     dateStr: string,
@@ -118,6 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const resendConfirmation = useCallback(
+    async (email: string): Promise<{ error: string | null }> => {
+      const supabase = getSupabaseClient()
+      if (!supabase) return { error: 'Supabase not configured' }
+      const { error } = await supabase.auth.resend({ type: 'signup', email })
+      return { error: error?.message ?? null }
+    },
+    [],
+  )
+
   const signOut = useCallback(async () => {
     const supabase = getSupabaseClient()
     if (!supabase) return
@@ -166,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signIn,
         signUp,
+        resendConfirmation,
         signOut,
         saveGameToDb,
         refreshProfile,
