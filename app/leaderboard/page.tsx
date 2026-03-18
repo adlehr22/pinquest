@@ -12,14 +12,6 @@ import { notifyNewFollower } from '@/utils/notifications'
 
 type Tab = 'today' | 'alltime' | 'friends'
 
-interface AlltimeEntry {
-  username: string
-  average_score: number
-  total_games: number
-  current_streak: number
-  longest_streak: number
-  rank: number
-}
 
 const SCORE_BANDS = [
   { label: '4,001–5,000', min: 4001, max: 5000, color: 'bg-emerald-400 dark:bg-emerald-500' },
@@ -70,7 +62,7 @@ export default function LeaderboardPage() {
   const { user, profile } = useAuth()
   const [tab, setTab] = useState<Tab>('today')
   const [todayRows, setTodayRows] = useState<LeaderboardEntry[]>([])
-  const [alltimeRows, setAlltimeRows] = useState<AlltimeEntry[]>([])
+  const [alltimeRows, setAlltimeRows] = useState<LeaderboardEntry[]>([])
   const [friendRows, setFriendRows] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [friendsLoading, setFriendsLoading] = useState(false)
@@ -208,11 +200,52 @@ export default function LeaderboardPage() {
       setLoading(true)
       const supabase = getSupabaseClient()
       if (!supabase) { setLoading(false); return }
-      const { data } = await supabase
-        .from('leaderboard_alltime')
-        .select('*')
-        .order('rank', { ascending: true })
-      setAlltimeRows((data as AlltimeEntry[]) ?? [])
+
+      const { data, error } = await supabase
+        .from('games')
+        .select(`
+          total_score,
+          played_date,
+          profiles!inner (
+            username,
+            current_streak
+          )
+        `)
+        .order('total_score', { ascending: false })
+        .limit(100)
+
+      console.log('All time data:', data)
+      console.log('All time error:', error)
+
+      type RawRow = {
+        total_score: number
+        played_date: string
+        profiles: { username: string; current_streak: number }
+          | { username: string; current_streak: number }[]
+      }
+
+      // Deduplicate: keep only the best score per username
+      const seen = new Set<string>()
+      const rows: LeaderboardEntry[] = ((data as unknown as RawRow[]) ?? [])
+        .filter((row) => {
+          const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+          const username = p?.username
+          if (!username || seen.has(username)) return false
+          seen.add(username)
+          return true
+        })
+        .map((row, i) => {
+          const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+          return {
+            username: p?.username ?? 'Anonymous',
+            total_score: row.total_score,
+            played_date: row.played_date,
+            current_streak: p?.current_streak ?? 0,
+            rank: i + 1,
+          }
+        })
+
+      setAlltimeRows(rows)
       setLoading(false)
     }
     fetchAlltime()
@@ -297,8 +330,8 @@ export default function LeaderboardPage() {
             rows={alltimeRows}
             myUsername={myUsername}
             isLoggedIn={isLoggedIn}
-            renderScore={(r) => Math.round((r as AlltimeEntry).average_score).toLocaleString()}
-            renderSub={(r) => `${(r as AlltimeEntry).total_games} games`}
+            renderScore={(r) => r.total_score.toLocaleString()}
+            renderSub={(r) => `${r.played_date} · 🔥 ${r.current_streak}`}
           />
         )}
 
