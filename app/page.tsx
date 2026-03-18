@@ -11,6 +11,7 @@ import { getSupabaseClient } from '@/lib/supabase'
 import AuthModal from '@/components/AuthModal'
 import ThemeToggle from '@/components/ThemeToggle'
 import WorldMapBg from '@/components/WorldMapBg'
+import NotificationBell from '@/components/NotificationBell'
 
 function HowToPlayModal({ onClose }: { onClose: () => void }) {
   return (
@@ -148,13 +149,16 @@ export default function HomePage() {
           >
             🏆 Leaderboard
           </button>
-          <ThemeToggle />
-          <button
-            onClick={() => router.push('/profile')}
-            className="text-xs font-bold text-gray-400 dark:text-slate-500 hover:text-sky-500 transition-colors flex items-center gap-1"
-          >
-            {user ? `👤 ${profile?.username ?? 'Profile'}` : '👤 Profile'}
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <NotificationBell />
+            <button
+              onClick={() => router.push('/profile')}
+              className="text-xs font-bold text-gray-400 dark:text-slate-500 hover:text-sky-500 transition-colors flex items-center gap-1"
+            >
+              {user ? `👤 ${profile?.username ?? 'Profile'}` : '👤 Profile'}
+            </button>
+          </div>
         </div>
 
         {/* App icon */}

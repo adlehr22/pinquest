@@ -109,19 +109,19 @@ export default function NotificationBell() {
           setOpen(next)
           if (next) fetchNotifications()
         }}
-        className="relative text-lg leading-none"
+        className="relative flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
         aria-label="Notifications"
       >
-        🔔
+        <span className="text-[24px] leading-none">🔔</span>
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[9px] font-bold leading-none">
+          <span className="absolute top-1 right-1 sm:-top-0.5 sm:-right-0.5 w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-white text-[9px] font-bold leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-[#162130] rounded-2xl shadow-xl border border-gray-100 dark:border-[#1e3a4a] z-50 overflow-hidden">
+        <div className="fixed left-2 right-2 top-16 z-[1000] sm:absolute sm:left-auto sm:right-0 sm:top-10 sm:w-80 bg-white dark:bg-[#162130] rounded-2xl shadow-xl border border-gray-100 dark:border-[#1e3a4a] overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#1e3a4a]">
             <span className="text-sm font-black text-gray-900 dark:text-slate-100">Notifications</span>
