@@ -70,7 +70,10 @@ export default function LeaderboardPage() {
   const [tab, setTab] = useState<Tab>('today')
   const [todayRows, setTodayRows] = useState<LeaderboardEntry[]>([])
   const [alltimeRows, setAlltimeRows] = useState<AlltimeEntry[]>([])
+  const [friendRows, setFriendRows] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [friendsLoading, setFriendsLoading] = useState(false)
+  const [followingCount, setFollowingCount] = useState<number | null>(null)
   const [myRank, setMyRank] = useState<number | null>(null)
   const [playedToday, setPlayedToday] = useState(false)
 
@@ -134,6 +137,64 @@ export default function LeaderboardPage() {
     }
     fetchToday()
   }, [profile])
+
+  useEffect(() => {
+    if (tab !== 'friends') return
+    if (!user) return
+    async function fetchFriends() {
+      setFriendsLoading(true)
+      const supabase = getSupabaseClient()
+      if (!supabase) { setFriendsLoading(false); return }
+
+      const today = new Date().toISOString().split('T')[0]
+
+      const { data: following } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user!.id)
+
+      const followingIds = following?.map((f: { following_id: string }) => f.following_id) ?? []
+      setFollowingCount(followingIds.length)
+
+      // Include current user's own score too
+      const allIds = [...followingIds, user!.id]
+
+      const { data } = await supabase
+        .from('games')
+        .select(`
+          total_score,
+          played_date,
+          profiles!inner (
+            username,
+            current_streak
+          )
+        `)
+        .in('user_id', allIds)
+        .eq('played_date', today)
+        .order('total_score', { ascending: false })
+
+      type RawRow = {
+        total_score: number
+        played_date: string
+        profiles: { username: string; current_streak: number }
+          | { username: string; current_streak: number }[]
+      }
+      const rows: LeaderboardEntry[] = ((data as unknown as RawRow[]) ?? []).map((row, i) => {
+        const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+        return {
+          username: p?.username ?? 'Anonymous',
+          total_score: row.total_score,
+          played_date: row.played_date,
+          current_streak: p?.current_streak ?? 0,
+          rank: i + 1,
+        }
+      })
+
+      setFriendRows(rows)
+      setFriendsLoading(false)
+    }
+    fetchFriends()
+  }, [tab, user])
 
   useEffect(() => {
     if (tab !== 'alltime') return
@@ -222,54 +283,54 @@ export default function LeaderboardPage() {
 
         {tab === 'friends' && (
           <div className="space-y-3">
-            <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] px-4 py-4">
-              <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">
-                Today&apos;s Players
-              </p>
-              {todayRows.length === 0 ? (
-                <p className="text-gray-400 dark:text-slate-500 text-sm text-center py-4">
-                  No players yet today — be the first!
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {todayRows.slice(0, 10).map((row) => (
-                    <div key={row.rank} className="flex items-center gap-2">
-                      <div className="w-8 flex items-center justify-center flex-shrink-0">
-                        <MedalOrRank rank={row.rank} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 dark:text-slate-200 truncate">
-                          {row.username}
-                        </p>
-                        <p className="text-xs text-gray-400 dark:text-slate-500">
-                          {row.total_score.toLocaleString()} pts
-                        </p>
-                      </div>
-                      {playedToday && (
-                        <button
-                          onClick={() => router.push('/game')}
-                          className="text-xs font-bold text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 flex-shrink-0 bg-sky-50 dark:bg-sky-900/20 px-2.5 py-1.5 rounded-lg"
-                        >
-                          Challenge
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {!playedToday && (
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl px-4 py-3 text-center">
-                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                  Play today&apos;s challenge to challenge others!
-                </p>
+            {!isLoggedIn ? (
+              <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-8 text-center">
+                <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">Sign in to see friends&apos; scores</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500">Create an account to follow friends and compare scores.</p>
+              </div>
+            ) : friendsLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white dark:bg-[#162130] rounded-xl h-14 animate-pulse" />
+                ))}
+              </div>
+            ) : followingCount === 0 ? (
+              <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-8 text-center">
+                <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">You&apos;re not following anyone yet</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">Add friends to see their scores here.</p>
                 <button
-                  onClick={() => router.push('/game')}
-                  className="mt-1.5 text-xs font-bold text-sky-500 hover:text-sky-600"
+                  onClick={() => router.push('/profile')}
+                  className="text-xs font-bold text-sky-500 hover:text-sky-600 dark:hover:text-sky-400"
                 >
-                  Play Now →
+                  Find friends →
                 </button>
               </div>
+            ) : friendRows.length === 0 ? (
+              <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-8 text-center">
+                <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">None of your friends have played today yet</p>
+                <button
+                  onClick={() => {
+                    const url = 'https://pinquest.app'
+                    if (navigator.share) {
+                      navigator.share({ title: 'PinQuest', url })
+                    } else {
+                      navigator.clipboard.writeText(url)
+                    }
+                  }}
+                  className="mt-2 text-xs font-bold text-sky-500 hover:text-sky-600 dark:hover:text-sky-400"
+                >
+                  Share PinQuest with friends →
+                </button>
+              </div>
+            ) : (
+              <LeaderboardTable
+                loading={false}
+                rows={friendRows}
+                myUsername={myUsername}
+                isLoggedIn={isLoggedIn}
+                renderScore={(r) => r.total_score.toLocaleString()}
+                renderSub={(r) => `🔥 ${r.current_streak}`}
+              />
             )}
           </div>
         )}
