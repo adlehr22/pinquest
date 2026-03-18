@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/AuthContext'
@@ -74,6 +74,9 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [friendsLoading, setFriendsLoading] = useState(false)
   const [followingCount, setFollowingCount] = useState<number | null>(null)
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set())
+  const [friendsRefetchKey, setFriendsRefetchKey] = useState(0)
+  const [toast, setToast] = useState<string | null>(null)
   const [myRank, setMyRank] = useState<number | null>(null)
   const [playedToday, setPlayedToday] = useState(false)
 
@@ -153,11 +156,12 @@ export default function LeaderboardPage() {
         .select('following_id')
         .eq('follower_id', user!.id)
 
-      const followingIds = following?.map((f: { following_id: string }) => f.following_id) ?? []
-      setFollowingCount(followingIds.length)
+      const ids = following?.map((f: { following_id: string }) => f.following_id) ?? []
+      setFollowingCount(ids.length)
+      setFollowingIds(new Set(ids))
 
       // Include current user's own score too
-      const allIds = [...followingIds, user!.id]
+      const allIds = [...ids, user!.id]
 
       const { data } = await supabase
         .from('games')
@@ -194,7 +198,8 @@ export default function LeaderboardPage() {
       setFriendsLoading(false)
     }
     fetchFriends()
-  }, [tab, user])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, user, friendsRefetchKey])
 
   useEffect(() => {
     if (tab !== 'alltime') return
@@ -211,6 +216,19 @@ export default function LeaderboardPage() {
     }
     fetchAlltime()
   }, [tab])
+
+  const handleFollow = useCallback(async (userId: string, username: string) => {
+    const supabase = getSupabaseClient()
+    if (!supabase || !user) return
+    // Optimistic update
+    setFollowingIds((prev) => new Set([...prev, userId]))
+    setFollowingCount((prev) => (prev ?? 0) + 1)
+    await supabase.from('follows').insert({ follower_id: user.id, following_id: userId })
+    setToast(`Following @${username}!`)
+    setTimeout(() => setToast(null), 2500)
+    // Re-fetch so new friend appears in the leaderboard list
+    setFriendsRefetchKey((k) => k + 1)
+  }, [user])
 
   const isLoggedIn = !!user
   const myUsername = profile?.username ?? ''
@@ -283,54 +301,67 @@ export default function LeaderboardPage() {
 
         {tab === 'friends' && (
           <div className="space-y-3">
+            {/* Toast */}
+            {toast && (
+              <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 dark:bg-slate-700 text-white text-sm font-semibold px-4 py-2.5 rounded-full shadow-lg animate-fadeIn">
+                {toast}
+              </div>
+            )}
+
             {!isLoggedIn ? (
               <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-8 text-center">
                 <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">Sign in to see friends&apos; scores</p>
                 <p className="text-xs text-gray-400 dark:text-slate-500">Create an account to follow friends and compare scores.</p>
               </div>
-            ) : friendsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-white dark:bg-[#162130] rounded-xl h-14 animate-pulse" />
-                ))}
-              </div>
-            ) : followingCount === 0 ? (
-              <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-8 text-center">
-                <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">You&apos;re not following anyone yet</p>
-                <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">Add friends to see their scores here.</p>
-                <button
-                  onClick={() => router.push('/profile')}
-                  className="text-xs font-bold text-sky-500 hover:text-sky-600 dark:hover:text-sky-400"
-                >
-                  Find friends →
-                </button>
-              </div>
-            ) : friendRows.length === 0 ? (
-              <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-8 text-center">
-                <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">None of your friends have played today yet</p>
-                <button
-                  onClick={() => {
-                    const url = 'https://pinquest.app'
-                    if (navigator.share) {
-                      navigator.share({ title: 'PinQuest', url })
-                    } else {
-                      navigator.clipboard.writeText(url)
-                    }
-                  }}
-                  className="mt-2 text-xs font-bold text-sky-500 hover:text-sky-600 dark:hover:text-sky-400"
-                >
-                  Share PinQuest with friends →
-                </button>
-              </div>
             ) : (
-              <LeaderboardTable
-                loading={false}
-                rows={friendRows}
-                myUsername={myUsername}
-                isLoggedIn={isLoggedIn}
-                renderScore={(r) => r.total_score.toLocaleString()}
-                renderSub={(r) => `🔥 ${r.current_streak}`}
-              />
+              <>
+                {/* Always-visible search bar */}
+                <FindFriendsSearch
+                  currentUserId={user!.id}
+                  followingIds={followingIds}
+                  onFollow={handleFollow}
+                />
+
+                {/* Friends leaderboard */}
+                {friendsLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="bg-white dark:bg-[#162130] rounded-xl h-14 animate-pulse" />
+                    ))}
+                  </div>
+                ) : followingCount === 0 ? (
+                  <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-6 text-center">
+                    <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">You&apos;re not following anyone yet</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500">Search for players above to follow them.</p>
+                  </div>
+                ) : friendRows.length === 0 ? (
+                  <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] p-6 text-center">
+                    <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1">None of your friends have played today yet</p>
+                    <button
+                      onClick={() => {
+                        const url = window.location.origin
+                        if (navigator.share) {
+                          navigator.share({ title: 'PinQuest', url })
+                        } else {
+                          navigator.clipboard.writeText(url)
+                        }
+                      }}
+                      className="mt-2 text-xs font-bold text-sky-500 hover:text-sky-600 dark:hover:text-sky-400"
+                    >
+                      Share PinQuest with friends →
+                    </button>
+                  </div>
+                ) : (
+                  <LeaderboardTable
+                    loading={false}
+                    rows={friendRows}
+                    myUsername={myUsername}
+                    isLoggedIn={isLoggedIn}
+                    renderScore={(r) => r.total_score.toLocaleString()}
+                    renderSub={(r) => `🔥 ${r.current_streak}`}
+                  />
+                )}
+              </>
             )}
           </div>
         )}
@@ -338,6 +369,124 @@ export default function LeaderboardPage() {
     </div>
   )
 }
+
+// ── Find Friends Search ───────────────────────────────────────────────────────
+
+interface SearchProfile {
+  id: string
+  username: string
+  current_streak: number
+  total_games: number
+}
+
+interface FindFriendsSearchProps {
+  currentUserId: string
+  followingIds: Set<string>
+  onFollow: (userId: string, username: string) => void
+}
+
+function FindFriendsSearch({ currentUserId, followingIds, onFollow }: FindFriendsSearchProps) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [results, setResults] = useState<SearchProfile[]>([])
+  const [searching, setSearching] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const term = searchTerm.trim()
+    if (!term) { setResults([]); return }
+    const timer = setTimeout(async () => {
+      setSearching(true)
+      const supabase = getSupabaseClient()
+      if (!supabase) { setSearching(false); return }
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, username, current_streak, total_games')
+        .ilike('username', `%${term}%`)
+        .neq('id', currentUserId)
+        .limit(10)
+      setResults((data as SearchProfile[]) ?? [])
+      setSearching(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm, currentUserId])
+
+  return (
+    <div className="bg-white dark:bg-[#162130] rounded-2xl border border-gray-100 dark:border-[#1e3a4a] overflow-hidden">
+      {/* Search input */}
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-[#1e3a4a]">
+        <svg className="w-4 h-4 text-gray-400 dark:text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+        </svg>
+        <input
+          ref={inputRef}
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by username…"
+          className="flex-1 text-sm bg-transparent text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none"
+        />
+        {searchTerm && (
+          <button
+            onClick={() => { setSearchTerm(''); setResults([]) }}
+            className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 text-lg leading-none"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Results */}
+      {searchTerm.trim() && (
+        <div>
+          {searching ? (
+            <div className="px-4 py-3">
+              <div className="h-10 bg-gray-100 dark:bg-slate-800 rounded-lg animate-pulse" />
+            </div>
+          ) : results.length === 0 ? (
+            <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-4">No users found</p>
+          ) : (
+            results.map((p) => {
+              const isFollowing = followingIds.has(p.id)
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-[#1e3a4a] last:border-0"
+                >
+                  {/* Avatar */}
+                  <div className="w-9 h-9 rounded-full bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-sky-600 dark:text-sky-400">
+                      {(p.username ?? '?')[0].toUpperCase()}
+                    </span>
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-slate-200 truncate">{p.username}</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500">🔥 {p.current_streak} streak · {p.total_games} games</p>
+                  </div>
+                  {/* Follow button */}
+                  {isFollowing ? (
+                    <span className="text-xs font-bold text-sky-500 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-900/20 flex-shrink-0">
+                      Following ✓
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => onFollow(p.id, p.username)}
+                      className="text-xs font-bold text-white bg-sky-400 hover:bg-sky-500 px-3 py-1.5 rounded-xl flex-shrink-0 transition-colors"
+                    >
+                      Follow +
+                    </button>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Leaderboard Table ─────────────────────────────────────────────────────────
 
 interface TableProps<T extends { rank: number; username: string; current_streak?: number }> {
   loading: boolean
