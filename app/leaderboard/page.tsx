@@ -8,6 +8,7 @@ import { LeaderboardEntry } from '@/types'
 import ThemeToggle from '@/components/ThemeToggle'
 import { getTodayDateString } from '@/utils/daily'
 import { hasPlayedToday } from '@/utils/storage'
+import { notifyNewFollower } from '@/utils/notifications'
 
 type Tab = 'today' | 'alltime' | 'friends'
 
@@ -224,11 +225,13 @@ export default function LeaderboardPage() {
     setFollowingIds((prev) => new Set([...Array.from(prev), userId]))
     setFollowingCount((prev) => (prev ?? 0) + 1)
     await supabase.from('follows').insert({ follower_id: user.id, following_id: userId })
+    // Notify the followed user
+    notifyNewFollower(userId, profile?.username ?? 'Someone')
     setToast(`Following @${username}!`)
     setTimeout(() => setToast(null), 2500)
     // Re-fetch so new friend appears in the leaderboard list
     setFriendsRefetchKey((k) => k + 1)
-  }, [user])
+  }, [user, profile])
 
   const isLoggedIn = !!user
   const myUsername = profile?.username ?? ''

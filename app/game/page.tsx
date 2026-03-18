@@ -11,6 +11,7 @@ import { playPinDrop, playWhoosh, playChime } from '@/utils/sound'
 import { getDailyLocations, getTodayDateString } from '@/utils/daily'
 import { recordGamePlayed, getStreakData } from '@/utils/streak'
 import { trackGameStarted, trackRoundCompleted, trackGameCompleted } from '@/utils/analytics'
+import { notifyGameCompleted } from '@/utils/notifications'
 import { useAuth } from '@/lib/AuthContext'
 import GameHeader from '@/components/GameHeader'
 import PromptCard from '@/components/PromptCard'
@@ -183,6 +184,7 @@ export default function GamePage() {
     // Save to DB — logged-in users save with profile, guests save anonymously
     if (user) {
       saveGameToDb(todayStr, totalScore, results, updatedStreak.current, updatedStreak.longest)
+      notifyGameCompleted(user.id, totalScore, todayStr)
     } else {
       saveGuestGame(todayStr, totalScore, results)
     }

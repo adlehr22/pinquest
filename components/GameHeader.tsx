@@ -4,6 +4,7 @@ import { GameState } from '@/types'
 import { setUnitPreference, setMutePreference } from '@/utils/storage'
 import UserAvatar from './UserAvatar'
 import ThemeToggle from './ThemeToggle'
+import NotificationBell from './NotificationBell'
 
 interface GameHeaderProps {
   state: GameState
@@ -80,6 +81,7 @@ export default function GameHeader({
         >
           {muted ? '🔇' : '🔊'}
         </button>
+        <NotificationBell />
         <ThemeToggle />
         <UserAvatar />
       </div>
