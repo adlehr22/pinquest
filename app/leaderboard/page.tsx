@@ -221,7 +221,7 @@ export default function LeaderboardPage() {
     const supabase = getSupabaseClient()
     if (!supabase || !user) return
     // Optimistic update
-    setFollowingIds((prev) => new Set([...prev, userId]))
+    setFollowingIds((prev) => new Set([...Array.from(prev), userId]))
     setFollowingCount((prev) => (prev ?? 0) + 1)
     await supabase.from('follows').insert({ follower_id: user.id, following_id: userId })
     setToast(`Following @${username}!`)
